@@ -1,0 +1,91 @@
+.navbar {
+    display: flex;
+    justify-content: center;
+    /* Center the container */
+    align-items: center;
+    padding: 0 2rem;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.container {
+    display: flex;
+    align-items: center;
+    gap: 5rem;
+    width: 100%;
+    max-width: 1200px;
+    /* Match page content max-width */
+    height: 100%;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--foreground);
+    letter-spacing: -0.025em;
+}
+
+.logoIcon {
+    display: block;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+.links {
+    display: flex;
+    align-items: center;
+    gap: 2.5rem;
+    height: 100%;
+}
+
+.link {
+    display: flex;
+    align-items: center;
+    color: var(--secondary);
+    transition: all 0.2s;
+    font-weight: 500;
+    font-size: 0.95rem;
+    height: 100%;
+    border-bottom: 2px solid transparent;
+}
+
+.link:hover {
+    color: var(--primary);
+}
+
+/* Active state simulation for now, can be dynamic later */
+.linkActive {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.user {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: 1px solid var(--primary-hover);
+    /* Subtle border */
+}
