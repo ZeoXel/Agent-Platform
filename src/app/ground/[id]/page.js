@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import styles from './page.module.css';
@@ -37,7 +37,7 @@ export default function GroundDetailPage() {
     const [estimatedTime] = useState('~2s');
 
     // Update inputs when initialInputs changes (item changes)
-    useMemo(() => {
+    useEffect(() => {
         setInputs(initialInputs);
     }, [initialInputs]);
 
