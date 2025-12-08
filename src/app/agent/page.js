@@ -2,10 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { HiPaperClip, HiWrench } from 'react-icons/hi2';
+import { IoSend } from 'react-icons/io5';
 import styles from './page.module.css';
 
 export default function AgentPage() {
     const chatEndRef = useRef(null);
+    const textareaRef = useRef(null);
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -21,6 +24,14 @@ export default function AgentPage() {
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isTyping]);
+
+    // Auto-resize textarea
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [input]);
 
     const handleSendMessage = async () => {
         if (!input.trim()) return;
@@ -105,12 +116,17 @@ export default function AgentPage() {
                 <div className={styles.chatScrollArea}>
                     {messages.length === 0 ? (
                         <div className={styles.welcomeMessage}>
-                            <div className={styles.welcomeIcon}>✨</div>
-                            <h1>你好！我能帮你做什么？</h1>
-                            <p>我可以帮你生成图片、编辑图片、或者回答问题。</p>
-                            <p style={{ fontSize: '0.9rem', color: '#94a3b8', marginTop: '0.5rem' }}>
-                                试试说：画一只可爱的小猫
-                            </p>
+                            <div className={styles.cosmicRing}>
+                                <div className={styles.ring}></div>
+                                <div className={styles.ring}></div>
+                                <div className={styles.ring}></div>
+                            </div>
+                            <h1 className={styles.welcomeTitle}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src="/logo.svg" alt="Agent Platform Logo" className={styles.welcomeLogo} />
+                                你好！我能帮你做点什么？
+                            </h1>
+                            <p className={styles.welcomeSubtitle}></p>
                         </div>
                     ) : (
                         messages.map((msg, idx) => (
@@ -158,6 +174,7 @@ export default function AgentPage() {
                 <div className={styles.inputContainer}>
                     <div className={styles.inputWrapper}>
                         <textarea
+                            ref={textareaRef}
                             className={styles.chatInput}
                             placeholder="输入消息... 例如：画一只可爱的小猫"
                             value={input}
@@ -169,10 +186,10 @@ export default function AgentPage() {
                             <div className={styles.leftActions}>
                                 {/* Asset Upload Button */}
                                 <button className={styles.actionButton} title="上传素材">
-                                    <span>📎</span> 上传
+                                    <HiPaperClip size={18} />
                                 </button>
                                 <button className={styles.actionButton} title="工具">
-                                    <span>🛠️</span> 工具
+                                    <HiWrench size={18} />
                                 </button>
                             </div>
                             <button
@@ -180,7 +197,7 @@ export default function AgentPage() {
                                 onClick={handleSendMessage}
                                 disabled={!input.trim() || isTyping}
                             >
-                                ➤
+                                <IoSend size={18} />
                             </button>
                         </div>
                     </div>
