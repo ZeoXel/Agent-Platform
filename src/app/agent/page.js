@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import styles from './page.module.css';
 
 export default function AgentPage() {
@@ -8,10 +9,12 @@ export default function AgentPage() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [error, setError] = useState(null);
+    const [sessionId, setSessionId] = useState(() => `session_${Date.now()}`); // 会话ID
     const [historyList, setHistoryList] = useState([
-        { id: 1, title: 'Previous Session: Image Gen', active: false },
-        { id: 2, title: 'Writing Assistant', active: false },
-        { id: 3, title: 'Project Planning', active: false }
+        { id: 1, title: '图像生成会话', active: false },
+        { id: 2, title: '写作助手', active: false },
+        { id: 3, title: '项目规划', active: false }
     ]);
 
     // Auto-scroll to bottom
@@ -19,23 +22,52 @@ export default function AgentPage() {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isTyping]);
 
-    const handleSendMessage = () => {
+    const handleSendMessage = async () => {
         if (!input.trim()) return;
 
         const userMsg = { role: 'user', content: input };
-        setMessages(prev => [...prev, userMsg]);
+        const updatedMessages = [...messages, userMsg];
+        setMessages(updatedMessages);
         setInput('');
         setIsTyping(true);
+        setError(null);
 
-        // Simulate AI Response
-        setTimeout(() => {
+        try {
+            const response = await fetch('/api/agent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId, // 传入会话ID
+                    messages: updatedMessages.map(m => ({
+                        role: m.role,
+                        content: m.content
+                    }))
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || '请求失败');
+            }
+
             const aiMsg = {
                 role: 'assistant',
-                content: "I'm your AI Agent. I can help you generate images, write text, or plan your projects. What would you like to do next?"
+                content: data.reply || '',
+                images: data.images || []
             };
             setMessages(prev => [...prev, aiMsg]);
+        } catch (err) {
+            setError(err.message || '发生未知错误');
+            const errorMsg = {
+                role: 'assistant',
+                content: `抱歉，发生了错误：${err.message}`,
+                images: []
+            };
+            setMessages(prev => [...prev, errorMsg]);
+        } finally {
             setIsTyping(false);
-        }, 1500);
+        }
     };
 
     const handleKeyDown = (e) => {
@@ -45,13 +77,19 @@ export default function AgentPage() {
         }
     };
 
+    const handleNewChat = () => {
+        setMessages([]);
+        setSessionId(`session_${Date.now()}`); // 重置会话ID
+        setError(null);
+    };
+
     return (
         <div className={styles.container}>
             {/* Left Sidebar: History */}
             <div className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
-                    <span>HISTORY</span>
-                    <button className={styles.newChatBtn} onClick={() => setMessages([])}>+ New Chat</button>
+                    <span>历史记录</span>
+                    <button className={styles.newChatBtn} onClick={handleNewChat}>+ 新对话</button>
                 </div>
                 <div className={styles.historyList}>
                     {historyList.map(item => (
@@ -68,25 +106,49 @@ export default function AgentPage() {
                     {messages.length === 0 ? (
                         <div className={styles.welcomeMessage}>
                             <div className={styles.welcomeIcon}>✨</div>
-                            <h1>How can I help you today?</h1>
-                            <p>I can assist with writing, analysis, and creative tasks.</p>
+                            <h1>你好！我能帮你做什么？</h1>
+                            <p>我可以帮你生成图片、编辑图片、或者回答问题。</p>
+                            <p style={{ fontSize: '0.9rem', color: '#94a3b8', marginTop: '0.5rem' }}>
+                                试试说：画一只可爱的小猫
+                            </p>
                         </div>
                     ) : (
                         messages.map((msg, idx) => (
                             <div key={idx} className={`${styles.messageRow} ${msg.role === 'user' ? styles.userRow : ''}`}>
-                                <div className={`${styles.avatar} ${msg.role === 'user' ? styles.userAvatar : styles.botAvatar}`}>
-                                    {msg.role === 'user' ? 'U' : 'AI'}
-                                </div>
                                 <div className={styles.messageContent}>
-                                    {msg.content}
+                                    {msg.role === 'assistant' ? (
+                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                    ) : (
+                                        msg.content
+                                    )}
+                                    {/* Render images if present */}
+                                    {msg.images && msg.images.length > 0 && (
+                                        <div className={styles.imageGrid}>
+                                            {msg.images.map((img, imgIdx) => (
+                                                <a
+                                                    key={imgIdx}
+                                                    href={img.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className={styles.imageLink}
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img
+                                                        src={img.url}
+                                                        alt={`生成的图片 ${imgIdx + 1}`}
+                                                        className={styles.generatedImage}
+                                                    />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))
                     )}
                     {isTyping && (
                         <div className={styles.messageRow}>
-                            <div className={`${styles.avatar} ${styles.botAvatar}`}>AI</div>
-                            <div className={styles.loadingBubble}>Thinking...</div>
+                            <div className={styles.loadingBubble}>思考中...</div>
                         </div>
                     )}
                     <div ref={chatEndRef} />
@@ -97,7 +159,7 @@ export default function AgentPage() {
                     <div className={styles.inputWrapper}>
                         <textarea
                             className={styles.chatInput}
-                            placeholder="Message Agent..."
+                            placeholder="输入消息... 例如：画一只可爱的小猫"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
@@ -106,51 +168,21 @@ export default function AgentPage() {
                         <div className={styles.inputActions}>
                             <div className={styles.leftActions}>
                                 {/* Asset Upload Button */}
-                                <button className={styles.actionButton} title="Upload Asset">
-                                    <span>📎</span> Upload
+                                <button className={styles.actionButton} title="上传素材">
+                                    <span>📎</span> 上传
                                 </button>
-                                <button className={styles.actionButton} title="Tools">
-                                    <span>🛠️</span> Tools
+                                <button className={styles.actionButton} title="工具">
+                                    <span>🛠️</span> 工具
                                 </button>
                             </div>
                             <button
                                 className={styles.sendButton}
                                 onClick={handleSendMessage}
-                                disabled={!input.trim() && !isTyping}
+                                disabled={!input.trim() || isTyping}
                             >
                                 ➤
                             </button>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Right Panel: Agent Details */}
-            <div className={styles.rightPanel}>
-                <div className={styles.modelHeader}>
-                    <h2 className={styles.modelTitle}>AI Agent</h2>
-                    <div className={styles.modelMeta}>
-                        Powered by Gemini 1.5 Pro
-                    </div>
-                </div>
-
-                <div className={styles.configSection}>
-                    <div className={styles.sectionTitle}>Capabilities</div>
-                    <div className={styles.capabilityItem}>
-                        <span className={styles.capabilityIcon}></span>
-                        <span>Image Generation</span>
-                    </div>
-                    <div className={styles.capabilityItem}>
-                        <span className={styles.capabilityIcon}></span>
-                        <span>Content Writing</span>
-                    </div>
-                    <div className={styles.capabilityItem}>
-                        <span className={styles.capabilityIcon}></span>
-                        <span>Data Analysis</span>
-                    </div>
-                    <div className={styles.capabilityItem}>
-                        <span className={styles.capabilityIcon}></span>
-                        <span>Code Assistance</span>
                     </div>
                 </div>
             </div>
