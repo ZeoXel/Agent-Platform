@@ -19,8 +19,8 @@ export default function Navbar() {
         </div>
         <div className={styles.links}>
           <Link href="/agent" className={styles.link}>Agent</Link>
-          <Link href="/marketplace" className={styles.link}>Ground</Link>
-          <Link href="/gallery" className={styles.link}>Library</Link>
+          <Link href="/ground" className={styles.link}>Ground</Link>
+          <Link href="/library" className={styles.link}>Library</Link>
         </div>
         <div className={styles.user}>
           <div className={styles.avatar}>U</div>

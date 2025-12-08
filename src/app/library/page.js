@@ -17,14 +17,14 @@ export default function GalleryPage() {
                         <div className={styles.thumbnail}></div>
                         <div className={styles.info}>
                             <h4>赛博朋克猫</h4>
-                            <span className={styles.source}>📱 AI对话</span>
+                            <span className={styles.source}>AI对话</span>
                         </div>
                     </div>
                     <div className={styles.item}>
                         <div className={styles.thumbnail}></div>
                         <div className={styles.info}>
                             <h4>产品视频</h4>
-                            <span className={styles.source}>🛠️ 工具</span>
+                            <span className={styles.source}>工具</span>
                         </div>
                     </div>
                 </div>

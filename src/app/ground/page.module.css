@@ -1,0 +1,295 @@
+/* Main Layout */
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 3rem;
+    min-height: 100vh;
+}
+
+/* Header / Search Area */
+.headerControl {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.pageTitle {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+.searchBar {
+    position: relative;
+    width: 400px;
+}
+
+.searchInput {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    background: white;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.searchInput:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.searchIcon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--secondary);
+    font-size: 1rem;
+}
+
+/* Sections */
+.section {
+    margin-bottom: 5rem;
+}
+
+.sectionHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.sectionTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--secondary);
+}
+
+.sectionTitle svg {
+    color: var(--primary);
+}
+
+.viewMore {
+    font-size: 0.85rem;
+    color: var(--primary);
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.viewMore:hover {
+    text-decoration: underline;
+}
+
+/* Hero / Featured Card */
+.featuredCard {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    background: white;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 4rem;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s;
+}
+
+.featuredCard:hover {
+    box-shadow: var(--card-shadow-hover);
+}
+
+.featuredImage {
+    height: 360px;
+    background-color: #eee;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.featuredContent {
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.featuredTitle {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--foreground);
+}
+
+.featuredDesc {
+    color: var(--secondary);
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+}
+
+.ctaButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary);
+    font-weight: 600;
+    font-size: 1rem;
+    transition: gap 0.2s;
+}
+
+.ctaButton:hover {
+    gap: 0.75rem;
+}
+
+/* Standard List Grid */
+.listGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+}
+
+.listItem {
+    display: flex;
+    /* align-items: center; */
+    background: white;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    gap: 1.25rem;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.listItem:hover {
+    border-color: var(--primary-hover);
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-2px);
+}
+
+.itemImage {
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
+    background-color: var(--secondary-light);
+    flex-shrink: 0;
+    background-size: cover;
+    background-position: center;
+    /* Fallback generic icon style */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--secondary);
+}
+
+.itemContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.itemHeader {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+}
+
+.itemTitle {
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--foreground);
+}
+
+.itemAuthor {
+    font-size: 0.85rem;
+    color: var(--secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.itemDesc {
+    font-size: 0.9rem;
+    color: var(--secondary);
+    margin-top: 0.25rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.itemMeta {
+    margin-top: 0.75rem;
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--secondary);
+}
+
+.metaTag {
+    background: var(--primary-light);
+    color: var(--primary);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.runCount {
+    color: var(--accent);
+}
+
+/* Reusable Grid for Workflows (Visual Cards) */
+.galleryGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.galleryCard {
+    background: white;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.galleryCard:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--card-shadow-hover);
+}
+
+.galleryPreview {
+    height: 180px;
+    background-color: var(--secondary-light);
+    background-size: cover;
+    background-position: center;
+}
+
+.galleryContent {
+    padding: 1rem;
+}
+
+.galleryTitle {
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.galleryAuthor {
+    font-size: 0.8rem;
+    color: var(--secondary);
+}
