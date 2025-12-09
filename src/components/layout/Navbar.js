@@ -1,8 +1,18 @@
+"use client";
+
 import Link from 'next/link';
 import Image from 'next/image';
 import styles from './Navbar.module.css';
+import { useWorkspace } from '@/workspace/contexts/WorkspaceContext';
 
 export default function Navbar() {
+  const { activeTab, switchTab, tabs } = useWorkspace();
+
+  const handleNavClick = (e, tabId) => {
+    e.preventDefault();
+    switchTab(tabId);
+  };
+
   return (
     <nav className={styles.navbar}>
       <div className={styles.container}>
@@ -18,9 +28,22 @@ export default function Navbar() {
           <span className={styles.logoText}>Agent Platform</span>
         </div>
         <div className={styles.links}>
-          <Link href="/agent" className={styles.link}>Agent</Link>
-          <Link href="/ground" className={styles.link}>Ground</Link>
-          <Link href="/library" className={styles.link}>Library</Link>
+          {tabs.map((tab) => {
+            const linkClassName =
+              activeTab === tab.id
+                ? `${styles.link} ${styles.linkActive}`
+                : styles.link;
+            return (
+              <Link
+                key={tab.id}
+                href="/workspace"
+                className={linkClassName}
+                onClick={(e) => handleNavClick(e, tab.id)}
+              >
+                {tab.label}
+              </Link>
+            );
+          })}
         </div>
         <div className={styles.user}>
           <div className={styles.avatar}>U</div>

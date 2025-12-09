@@ -147,10 +147,19 @@
     font-weight: 600;
     font-size: 1rem;
     transition: gap 0.2s;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
 }
 
 .ctaButton:hover {
     gap: 0.75rem;
+}
+
+.ctaButton:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 4px;
 }
 
 /* Standard List Grid */
@@ -162,7 +171,6 @@
 
 .listItem {
     display: flex;
-    /* align-items: center; */
     background: white;
     border: 1px solid var(--card-border);
     border-radius: 8px;
@@ -170,12 +178,22 @@
     gap: 1.25rem;
     transition: all 0.2s;
     cursor: pointer;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    outline: none;
 }
 
 .listItem:hover {
     border-color: var(--primary-hover);
     box-shadow: var(--card-shadow-hover);
     transform: translateY(-2px);
+}
+
+.listItem:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 4px;
 }
 
 .itemImage {
@@ -265,11 +283,21 @@
     overflow: hidden;
     transition: all 0.2s;
     cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    outline: none;
+    padding: 0;
 }
 
 .galleryCard:hover {
     transform: translateY(-4px);
     box-shadow: var(--card-shadow-hover);
+}
+
+.galleryCard:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 4px;
 }
 
 .galleryPreview {

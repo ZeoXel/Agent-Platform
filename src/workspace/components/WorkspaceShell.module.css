@@ -1,0 +1,11 @@
+.container {
+  width: 100%;
+}
+
+.panel {
+  width: 100%;
+}
+
+.panelHidden {
+  display: none;
+}

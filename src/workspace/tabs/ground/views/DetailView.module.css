@@ -34,10 +34,19 @@
     margin-bottom: 1.5rem;
     font-size: 0.9rem;
     transition: color 0.2s;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
 }
 
 .backLink:hover {
     color: var(--primary);
+}
+
+.backLink:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 4px;
 }
 
 .titleSection {
@@ -360,11 +369,23 @@
     border: 1px solid var(--card-border);
     cursor: pointer;
     transition: transform 0.2s;
+    background: white;
+    outline: none;
+    padding: 0;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
 }
 
 .exampleCard:hover {
     transform: translateY(-2px);
     box-shadow: var(--card-shadow);
+}
+
+.exampleCard:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 4px;
 }
 
 .exampleImage {

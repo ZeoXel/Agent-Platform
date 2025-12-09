@@ -53,18 +53,49 @@
     align-items: center;
     color: var(--secondary);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    font-weight: 500;
+    font-weight: 600;
     font-size: 0.95rem;
     position: relative;
     cursor: pointer;
+    /* Button reset styles */
+    background: none;
+    border: none;
+    padding: 0.35rem 0.85rem;
+    font-family: inherit;
+    border-radius: 999px;
+    text-decoration: none;
+    isolation: isolate;
+    z-index: 0;
+}
+
+.link::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgba(37, 99, 235, 0.15);
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: -1;
 }
 
 .link:hover {
     color: rgba(37, 99, 235, 0.8);
-    transform: rotate(-2deg);
 }
 
-/* Active state simulation for now, can be dynamic later */
+.link:hover::before {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.link:active {
+    color: rgba(37, 99, 235, 1);
+}
+
+/* Active state - when page is currently shown */
 .linkActive {
     color: rgba(37, 99, 235, 1);
 }
