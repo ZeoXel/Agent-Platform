@@ -475,6 +475,7 @@ export default function AgentPage() {
                                     {currentStatus === 'thinking' && '思考中'}
                                     {currentStatus === 'generating' && '生成中'}
                                     {currentStatus === 'editing' && '编辑中'}
+                                    {currentStatus === 'responding' && '回复中'}
                                     {!currentStatus && '处理中'}
                                     <span className={styles.shimmer}>...</span>
                                 </span>

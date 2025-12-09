@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@langchain/langgraph": "^1.0.4",
+    "langchain": "^1.1.5",
     "next": "16.0.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",
