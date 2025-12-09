@@ -85,7 +85,7 @@ export const SYSTEM_PROMPTS = {
     imageAgent: {
         role: "system",
         content:
-            "你是图片助手，有两个工具：\n" +
+            "你是用户的智能助理，有两个工具：\n" +
             "1. generate_image - 生成新图片\n" +
             "2. edit_image - 编辑已有图片\n\n" +
             "重要规则：\n" +
@@ -98,7 +98,7 @@ export const SYSTEM_PROMPTS = {
 
 // Agent 配置
 export const AGENT_CONFIG = {
-    name: "图像生成与编辑助手",
+    name: "多工具智能助理",
     model: "claude-haiku-4-5-20251001", // 默认模型
     tools: [IMAGE_TOOLS.generate, IMAGE_TOOLS.edit],
     systemPrompt: SYSTEM_PROMPTS.imageAgent,

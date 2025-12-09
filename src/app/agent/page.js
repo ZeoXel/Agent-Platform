@@ -12,6 +12,7 @@ export default function AgentPage() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [currentStatus, setCurrentStatus] = useState(''); // 当前状态：thinking, generating, editing, responding
     const [error, setError] = useState(null);
     const [sessionId, setSessionId] = useState(() => `session_${Date.now()}`); // 会话ID
     const [historyList, setHistoryList] = useState([
@@ -23,7 +24,7 @@ export default function AgentPage() {
     // Auto-scroll to bottom
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isTyping]);
+    }, [messages, isTyping, currentStatus]);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -41,6 +42,7 @@ export default function AgentPage() {
         setMessages(updatedMessages);
         setInput('');
         setIsTyping(true);
+        setCurrentStatus('thinking');
         setError(null);
 
         try {
@@ -48,7 +50,7 @@ export default function AgentPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sessionId, // 传入会话ID
+                    sessionId,
                     messages: updatedMessages.map(m => ({
                         role: m.role,
                         content: m.content
@@ -56,18 +58,100 @@ export default function AgentPage() {
                 })
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-                throw new Error(data.error || '请求失败');
+                throw new Error('请求失败');
             }
 
-            const aiMsg = {
-                role: 'assistant',
-                content: data.reply || '',
-                images: data.images || []
-            };
-            setMessages(prev => [...prev, aiMsg]);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            let assistantContent = '';
+            let assistantImages = [];
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        try {
+                            const parsed = JSON.parse(data);
+
+                            if (parsed.type === 'status') {
+                                setCurrentStatus(parsed.status);
+                            } else if (parsed.type === 'content') {
+                                assistantContent += parsed.content;
+                                // 实时更新消息
+                                setMessages(prev => {
+                                    const newMessages = [...prev];
+                                    const lastMsg = newMessages[newMessages.length - 1];
+                                    if (lastMsg && lastMsg.role === 'assistant') {
+                                        // 创建新对象而不是修改原对象
+                                        newMessages[newMessages.length - 1] = {
+                                            ...lastMsg,
+                                            content: assistantContent
+                                        };
+                                    } else {
+                                        newMessages.push({
+                                            role: 'assistant',
+                                            content: assistantContent,
+                                            images: assistantImages
+                                        });
+                                    }
+                                    return newMessages;
+                                });
+                            } else if (parsed.type === 'images') {
+                                assistantImages = parsed.images;
+                                setMessages(prev => {
+                                    const newMessages = [...prev];
+                                    const lastMsg = newMessages[newMessages.length - 1];
+                                    if (lastMsg && lastMsg.role === 'assistant') {
+                                        // 创建新对象而不是修改原对象
+                                        newMessages[newMessages.length - 1] = {
+                                            ...lastMsg,
+                                            images: assistantImages
+                                        };
+                                    } else {
+                                        newMessages.push({
+                                            role: 'assistant',
+                                            content: assistantContent,
+                                            images: assistantImages
+                                        });
+                                    }
+                                    return newMessages;
+                                });
+                            } else if (parsed.type === 'done') {
+                                // 完成
+                                break;
+                            } else if (parsed.type === 'error') {
+                                throw new Error(parsed.error);
+                            }
+                        } catch (e) {
+                            console.error('解析SSE数据失败:', e);
+                        }
+                    }
+                }
+            }
+
+            // 如果没有添加助手消息，添加一个
+            setMessages(prev => {
+                const lastMsg = prev[prev.length - 1];
+                if (!lastMsg || lastMsg.role !== 'assistant') {
+                    return [...prev, {
+                        role: 'assistant',
+                        content: assistantContent,
+                        images: assistantImages
+                    }];
+                }
+                return prev;
+            });
+
         } catch (err) {
             setError(err.message || '发生未知错误');
             const errorMsg = {
@@ -78,6 +162,7 @@ export default function AgentPage() {
             setMessages(prev => [...prev, errorMsg]);
         } finally {
             setIsTyping(false);
+            setCurrentStatus('');
         }
     };
 
@@ -164,7 +249,15 @@ export default function AgentPage() {
                     )}
                     {isTyping && (
                         <div className={styles.messageRow}>
-                            <div className={styles.loadingBubble}>思考中...</div>
+                            <div className={styles.loadingBubble}>
+                                <span className={styles.statusText}>
+                                    {currentStatus === 'thinking' && '思考中'}
+                                    {currentStatus === 'generating' && '生成中'}
+                                    {currentStatus === 'editing' && '编辑中'}
+                                    {!currentStatus && '处理中'}
+                                    <span className={styles.shimmer}>...</span>
+                                </span>
+                            </div>
                         </div>
                     )}
                     <div ref={chatEndRef} />
