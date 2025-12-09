@@ -10,40 +10,49 @@ import { useSessionManager } from '@/hooks/useSessionManager';
 export default function AgentPage() {
     const chatEndRef = useRef(null);
     const textareaRef = useRef(null);
+    const fileInputRef = useRef(null);
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [isStreamingContent, setIsStreamingContent] = useState(false); // 是否正在流式输出内容
     const [currentStatus, setCurrentStatus] = useState(''); // 当前状态：thinking, generating, editing, responding
     const [error, setError] = useState(null);
+    const [attachments, setAttachments] = useState([]);
 
     // 使用会话管理hook
     const {
         sessions,
         activeSessionId,
+        activeSession,
         isLoading,
         createSession,
         updateSessionMessages,
         removeSession,
-        switchSession,
-        getActiveSession
+        switchSession
     } = useSessionManager();
+    const hydratedSessionRef = useRef(null);
 
     // 初始化：加载活跃会话或创建新会话
     useEffect(() => {
         if (isLoading) return;
 
         if (!activeSessionId) {
-            // 如果没有活跃会话，创建新会话
-            createSession();
-        } else {
-            // 加载活跃会话的消息
-            const activeSession = getActiveSession();
-            if (activeSession) {
-                setMessages(activeSession.messages);
+            if (!sessions.length) {
+                createSession();
+            } else {
+                setMessages([]);
             }
+            hydratedSessionRef.current = null;
+            return;
         }
-    }, [isLoading, activeSessionId, createSession, getActiveSession]);
+
+        if (!activeSession) return;
+        if (hydratedSessionRef.current === activeSession.id) return;
+
+        setMessages(activeSession.messages || []);
+        setAttachments([]);
+        hydratedSessionRef.current = activeSession.id;
+    }, [isLoading, activeSessionId, activeSession, sessions.length, createSession]);
 
     // 保存消息变化到localStorage
     // 使用 ref 来跟踪上次保存的消息，避免重复保存
@@ -94,13 +103,101 @@ export default function AgentPage() {
         }
     }, [input]);
 
-    const handleSendMessage = async () => {
-        if (!input.trim() || !activeSessionId) return;
+    const handleSelectAttachment = async (event) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) return;
 
-        const userMsg = { role: 'user', content: input, timestamp: Date.now() };
+        const readFile = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    resolve({
+                        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        url: reader.result,
+                    });
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        };
+
+        try {
+            const fileEntries = await Promise.all(files.map(readFile));
+            setAttachments(prev => [...prev, ...fileEntries]);
+        } catch (err) {
+            console.error('读取素材失败', err);
+        } finally {
+            event.target.value = '';
+        }
+    };
+
+    const handleRemoveAttachment = (id) => {
+        setAttachments(prev => prev.filter(file => file.id !== id));
+    };
+
+    const formatMessageForApi = (message) => {
+        const formatted = {
+            role: message.role,
+            content: message.content
+        };
+
+        const hasAttachments = Array.isArray(message.attachments) && message.attachments.length > 0;
+        if (!hasAttachments) {
+            return formatted;
+        }
+
+        const parts = [];
+        if (typeof message.content === 'string' && message.content.trim()) {
+            parts.push({
+                type: 'text',
+                text: message.content.trim()
+            });
+        }
+
+        message.attachments.forEach((file) => {
+            if (file.url) {
+                parts.push({
+                    type: 'image_url',
+                    image_url: { url: file.url }
+                });
+            }
+        });
+
+        formatted.content = parts;
+        formatted.attachments = message.attachments.map(({ url, name, type }) => ({
+            url,
+            name,
+            type
+        }));
+
+        return formatted;
+    };
+
+    const handleSendMessage = async () => {
+        const trimmedInput = input.trim();
+        if (!trimmedInput && attachments.length === 0) return;
+        if (!activeSessionId) return;
+
+        const userImagePreviews = attachments.map(file => ({
+            url: file.url,
+            name: file.name,
+            isLocal: true
+        }));
+
+        const userMsg = {
+            role: 'user',
+            content: trimmedInput,
+            timestamp: Date.now(),
+            attachments,
+            images: userImagePreviews
+        };
         const updatedMessages = [...messages, userMsg];
         setMessages(updatedMessages);
         setInput('');
+        setAttachments([]);
         setIsTyping(true);
         setCurrentStatus('thinking');
         setError(null);
@@ -111,10 +208,7 @@ export default function AgentPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     sessionId: activeSessionId,
-                        messages: updatedMessages.map(m => ({
-                            role: m.role,
-                            content: m.content
-                        }))
+                        messages: updatedMessages.map(formatMessageForApi)
                 })
             });
 
@@ -263,6 +357,7 @@ export default function AgentPage() {
     const handleNewChat = () => {
         setMessages([]);
         setError(null);
+        setAttachments([]);
         createSession();
     };
 
@@ -272,6 +367,7 @@ export default function AgentPage() {
         if (session) {
             setMessages(session.messages);
         }
+        setAttachments([]);
         setError(null);
     };
 
@@ -282,6 +378,7 @@ export default function AgentPage() {
             // 如果删除的是当前会话，清空消息
             if (sessionId === activeSessionId) {
                 setMessages([]);
+                setAttachments([]);
             }
         }
     };
@@ -390,6 +487,30 @@ export default function AgentPage() {
                 {/* Input Area */}
                 <div className={styles.inputContainer}>
                     <div className={styles.inputWrapper}>
+                        {attachments.length > 0 && (
+                            <div className={styles.attachmentsPreview}>
+                                {attachments.map(file => (
+                                    <div key={file.id} className={styles.attachmentChip}>
+                                        {file.type?.startsWith('image/') && (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={file.url} alt={file.name} className={styles.attachmentThumb} />
+                                        )}
+                                        <div className={styles.attachmentInfo}>
+                                            <span className={styles.attachmentName}>{file.name}</span>
+                                            <span className={styles.attachmentSize}>{(file.size / 1024).toFixed(1)} KB</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className={styles.attachmentRemove}
+                                            onClick={() => handleRemoveAttachment(file.id)}
+                                            title="移除素材"
+                                        >
+                                            <HiTrash size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <textarea
                             ref={textareaRef}
                             className={styles.chatInput}
@@ -401,8 +522,21 @@ export default function AgentPage() {
                         />
                         <div className={styles.inputActions}>
                             <div className={styles.leftActions}>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    multiple
+                                    accept="image/*"
+                                    className={styles.fileInput}
+                                    onChange={handleSelectAttachment}
+                                />
                                 {/* Asset Upload Button */}
-                                <button className={styles.actionButton} title="上传素材">
+                                <button
+                                    type="button"
+                                    className={styles.actionButton}
+                                    title="上传素材"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
                                     <HiPaperClip size={18} />
                                 </button>
                                 <button className={styles.actionButton} title="工具">
@@ -412,7 +546,7 @@ export default function AgentPage() {
                             <button
                                 className={styles.sendButton}
                                 onClick={handleSendMessage}
-                                disabled={!input.trim() || isTyping}
+                                disabled={( !input.trim() && attachments.length === 0) || isTyping}
                             >
                                 <IoSend size={18} />
                             </button>

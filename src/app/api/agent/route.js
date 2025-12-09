@@ -113,6 +113,17 @@ export async function POST(request) {
     // 获取会话状态
     const sessionState = getSessionState(sessionId);
 
+    // 收集用户上传的图片引用，并将其作为最近可编辑图像
+    const latestUserMessage = [...clientMessages].reverse().find((m) => m.role === "user");
+    if (latestUserMessage?.attachments?.length) {
+      const uploadedUrls = latestUserMessage.attachments
+        .map((file) => file.url)
+        .filter(Boolean);
+      if (uploadedUrls.length) {
+        sessionState.lastImages = uploadedUrls;
+      }
+    }
+
     // 构建消息历史
     const messages = [
       AGENT_CONFIG.systemPrompt,

@@ -3,7 +3,7 @@
  * 提供对话历史的增删改查功能
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getSessions,
   saveSession,
@@ -59,6 +59,10 @@ export function useSessionManager() {
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionIdState] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const activeSession = useMemo(() => {
+    if (!activeSessionId) return null;
+    return sessions.find((session) => session.id === activeSessionId) || null;
+  }, [sessions, activeSessionId]);
 
   // 初始化：从localStorage加载数据
   useEffect(() => {
@@ -203,22 +207,6 @@ export function useSessionManager() {
   }, []);
 
   /**
-   * 获取当前活跃会话
-   * @returns {Object|null} 活跃会话对象或null
-   */
-  const getActiveSession = useCallback(() => {
-    // 使用最新的 sessions 状态
-    let currentSession = null;
-    setSessions(prev => {
-      if (activeSessionId) {
-        currentSession = prev.find(s => s.id === activeSessionId) || null;
-      }
-      return prev; // 不修改 sessions
-    });
-    return currentSession;
-  }, [activeSessionId]); // 只依赖 activeSessionId
-
-  /**
    * 清空所有会话
    */
   const clearAllSessions = useCallback(() => {
@@ -236,6 +224,7 @@ export function useSessionManager() {
     // 状态
     sessions,
     activeSessionId,
+    activeSession,
     isLoading,
 
     // 方法
@@ -243,7 +232,6 @@ export function useSessionManager() {
     updateSessionMessages,
     removeSession,
     switchSession,
-    getActiveSession,
     clearAllSessions
   };
 }
