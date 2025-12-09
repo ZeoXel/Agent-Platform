@@ -52,21 +52,21 @@
     display: flex;
     align-items: center;
     color: var(--secondary);
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     font-weight: 500;
     font-size: 0.95rem;
-    height: 100%;
-    border-bottom: 2px solid transparent;
+    position: relative;
+    cursor: pointer;
 }
 
 .link:hover {
-    color: var(--primary);
+    color: rgba(37, 99, 235, 0.8);
+    transform: rotate(-2deg);
 }
 
 /* Active state simulation for now, can be dynamic later */
 .linkActive {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
+    color: rgba(37, 99, 235, 1);
 }
 
 .user {
@@ -79,13 +79,37 @@
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: var(--primary-light);
-    color: var(--primary);
+    background: rgba(37, 99, 235, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--foreground);
     display: flex;
     justify-content: center;
     align-items: center;
     font-weight: 600;
     font-size: 0.9rem;
-    border: 1px solid var(--primary-hover);
-    /* Subtle border */
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.avatar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.6) 0%,
+            rgba(255, 255, 255, 0) 50%,
+            rgba(255, 255, 255, 0.3) 100%);
+    pointer-events: none;
+}
+
+.avatar:hover {
+    background: rgba(37, 99, 235, 0.25);
+    transform: rotate(-5deg);
 }

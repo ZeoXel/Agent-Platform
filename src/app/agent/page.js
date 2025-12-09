@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { HiPaperClip, HiWrench } from 'react-icons/hi2';
+import { HiPaperClip, HiWrench, HiTrash } from 'react-icons/hi2';
 import { IoSend } from 'react-icons/io5';
 import styles from './page.module.css';
+import { useSessionManager } from '@/hooks/useSessionManager';
 
 export default function AgentPage() {
     const chatEndRef = useRef(null);
@@ -12,19 +13,78 @@ export default function AgentPage() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [isStreamingContent, setIsStreamingContent] = useState(false); // 是否正在流式输出内容
     const [currentStatus, setCurrentStatus] = useState(''); // 当前状态：thinking, generating, editing, responding
     const [error, setError] = useState(null);
-    const [sessionId, setSessionId] = useState(() => `session_${Date.now()}`); // 会话ID
-    const [historyList, setHistoryList] = useState([
-        { id: 1, title: '图像生成会话', active: false },
-        { id: 2, title: '写作助手', active: false },
-        { id: 3, title: '项目规划', active: false }
-    ]);
+
+    // 使用会话管理hook
+    const {
+        sessions,
+        activeSessionId,
+        isLoading,
+        createSession,
+        updateSessionMessages,
+        removeSession,
+        switchSession,
+        getActiveSession
+    } = useSessionManager();
+
+    // 初始化：加载活跃会话或创建新会话
+    useEffect(() => {
+        if (isLoading) return;
+
+        if (!activeSessionId) {
+            // 如果没有活跃会话，创建新会话
+            createSession();
+        } else {
+            // 加载活跃会话的消息
+            const activeSession = getActiveSession();
+            if (activeSession) {
+                setMessages(activeSession.messages);
+            }
+        }
+    }, [isLoading, activeSessionId, createSession, getActiveSession]);
+
+    // 保存消息变化到localStorage
+    // 使用 ref 来跟踪上次保存的消息，避免重复保存
+    const prevMessagesRef = useRef([]);
+    useEffect(() => {
+        if (activeSessionId && messages.length > 0 && !isTyping) {
+            // 只在消息实际变化时保存
+            const messagesChanged = JSON.stringify(prevMessagesRef.current) !== JSON.stringify(messages);
+            if (messagesChanged) {
+                updateSessionMessages(activeSessionId, messages);
+                prevMessagesRef.current = messages;
+            }
+        }
+    }, [messages, activeSessionId, isTyping, updateSessionMessages]);
 
     // Auto-scroll to bottom
+    // 滚动策略：
+    // 1. 新消息添加时滚动（用户发送消息、AI回复开始）
+    // 2. 状态提示出现时滚动
+    // 3. 流式输出完成时滚动一次
+    // 4. 流式输出过程中不滚动
+    const prevMessageCountRef = useRef(0);
+    const prevIsStreamingRef = useRef(false);
+
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isTyping, currentStatus]);
+        const messageCountChanged = messages.length !== prevMessageCountRef.current;
+        const statusAppeared = isTyping && currentStatus;
+        const streamJustFinished = prevIsStreamingRef.current && !isStreamingContent;
+
+        const shouldScroll = messageCountChanged || statusAppeared || streamJustFinished;
+
+        if (shouldScroll) {
+            // 使用 setTimeout 确保 DOM 已更新
+            setTimeout(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 0);
+            prevMessageCountRef.current = messages.length;
+        }
+
+        prevIsStreamingRef.current = isStreamingContent;
+    }, [messages.length, isTyping, currentStatus, isStreamingContent]);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -35,9 +95,9 @@ export default function AgentPage() {
     }, [input]);
 
     const handleSendMessage = async () => {
-        if (!input.trim()) return;
+        if (!input.trim() || !activeSessionId) return;
 
-        const userMsg = { role: 'user', content: input };
+        const userMsg = { role: 'user', content: input, timestamp: Date.now() };
         const updatedMessages = [...messages, userMsg];
         setMessages(updatedMessages);
         setInput('');
@@ -50,7 +110,7 @@ export default function AgentPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sessionId,
+                    sessionId: activeSessionId,
                     messages: updatedMessages.map(m => ({
                         role: m.role,
                         content: m.content
@@ -68,6 +128,7 @@ export default function AgentPage() {
             let assistantContent = '';
             let assistantImages = [];
             let buffer = '';
+            let hasHiddenStatus = false; // 追踪是否已隐藏状态
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -87,6 +148,13 @@ export default function AgentPage() {
                                 setCurrentStatus(parsed.status);
                             } else if (parsed.type === 'content') {
                                 assistantContent += parsed.content;
+                                // 收到第一个内容时，隐藏状态提示并标记开始流式输出
+                                if (!hasHiddenStatus) {
+                                    hasHiddenStatus = true;
+                                    setIsTyping(false);
+                                    setCurrentStatus('');
+                                    setIsStreamingContent(true);
+                                }
                                 // 实时更新消息
                                 setMessages(prev => {
                                     const newMessages = [...prev];
@@ -95,13 +163,15 @@ export default function AgentPage() {
                                         // 创建新对象而不是修改原对象
                                         newMessages[newMessages.length - 1] = {
                                             ...lastMsg,
-                                            content: assistantContent
+                                            content: assistantContent,
+                                            isStreaming: true
                                         };
                                     } else {
                                         newMessages.push({
                                             role: 'assistant',
                                             content: assistantContent,
-                                            images: assistantImages
+                                            images: assistantImages,
+                                            isStreaming: true
                                         });
                                     }
                                     return newMessages;
@@ -127,7 +197,23 @@ export default function AgentPage() {
                                     return newMessages;
                                 });
                             } else if (parsed.type === 'done') {
-                                // 完成
+                                // 完成，标记流式结束并更新消息
+                                setMessages(prev => {
+                                    const newMessages = [...prev];
+                                    const lastMsg = newMessages[newMessages.length - 1];
+                                    if (lastMsg && lastMsg.role === 'assistant') {
+                                        newMessages[newMessages.length - 1] = {
+                                            ...lastMsg,
+                                            isStreaming: false
+                                        };
+                                    }
+                                    return newMessages;
+                                });
+                                // 使用 setTimeout 确保在下一个事件循环中更新状态
+                                // 这样可以确保 prevIsStreamingRef 已经是 true
+                                setTimeout(() => {
+                                    setIsStreamingContent(false);
+                                }, 0);
                                 break;
                             } else if (parsed.type === 'error') {
                                 throw new Error(parsed.error);
@@ -163,6 +249,7 @@ export default function AgentPage() {
         } finally {
             setIsTyping(false);
             setCurrentStatus('');
+            setIsStreamingContent(false);
         }
     };
 
@@ -175,8 +262,28 @@ export default function AgentPage() {
 
     const handleNewChat = () => {
         setMessages([]);
-        setSessionId(`session_${Date.now()}`); // 重置会话ID
         setError(null);
+        createSession();
+    };
+
+    const handleSwitchSession = (sessionId) => {
+        switchSession(sessionId);
+        const session = sessions.find(s => s.id === sessionId);
+        if (session) {
+            setMessages(session.messages);
+        }
+        setError(null);
+    };
+
+    const handleDeleteSession = (sessionId, e) => {
+        e.stopPropagation();
+        if (confirm('确定要删除这个会话吗？')) {
+            removeSession(sessionId);
+            // 如果删除的是当前会话，清空消息
+            if (sessionId === activeSessionId) {
+                setMessages([]);
+            }
+        }
     };
 
     return (
@@ -185,14 +292,31 @@ export default function AgentPage() {
             <div className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
                     <span>历史记录</span>
-                    <button className={styles.newChatBtn} onClick={handleNewChat}>+ 新对话</button>
+                    <button className={styles.newChatBtn} onClick={handleNewChat}>+</button>
                 </div>
                 <div className={styles.historyList}>
-                    {historyList.map(item => (
-                        <div key={item.id} className={`${styles.historyItem} ${item.active ? styles.active : ''}`}>
-                            {item.title}
-                        </div>
-                    ))}
+                    {isLoading ? (
+                        <div className={styles.loadingText}>加载中...</div>
+                    ) : sessions.length === 0 ? (
+                        <div className={styles.emptyText}>暂无历史记录</div>
+                    ) : (
+                        sessions.map(session => (
+                            <div
+                                key={session.id}
+                                className={`${styles.historyItem} ${session.id === activeSessionId ? styles.active : ''}`}
+                                onClick={() => handleSwitchSession(session.id)}
+                            >
+                                <span className={styles.historyTitle}>{session.title}</span>
+                                <button
+                                    className={styles.deleteBtn}
+                                    onClick={(e) => handleDeleteSession(session.id, e)}
+                                    title="删除会话"
+                                >
+                                    <HiTrash size={14} />
+                                </button>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -216,7 +340,7 @@ export default function AgentPage() {
                     ) : (
                         messages.map((msg, idx) => (
                             <div key={idx} className={`${styles.messageRow} ${msg.role === 'user' ? styles.userRow : ''}`}>
-                                <div className={styles.messageContent}>
+                                <div className={`${styles.messageContent} ${msg.isStreaming ? styles.streaming : ''}`}>
                                     {msg.role === 'assistant' ? (
                                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                                     ) : (
