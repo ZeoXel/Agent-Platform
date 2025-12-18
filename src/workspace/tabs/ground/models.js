@@ -170,3 +170,88 @@ export const recommendedWorkflows = [
         examples: []
     }
 ];
+
+// Pack 封面图映射
+const packCoverImages = {
+    'document-pack': 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&auto=format&fit=crop',
+    'office-pack': 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=800&auto=format&fit=crop',
+    'creator-pack': 'https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=800&auto=format&fit=crop',
+    default: 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=800&auto=format&fit=crop',
+};
+
+// Pack 图标映射
+const packIcons = {
+    'document-pack': '📄',
+    'office-pack': '💼',
+    'creator-pack': '🎨',
+    default: '📦',
+};
+
+// 将 Pack API 数据转换为 Ground 卡片格式
+export function packToGroundItem(pack) {
+    const coverImage = packCoverImages[pack.name] || packCoverImages.default;
+    const icon = packIcons[pack.name] || packIcons.default;
+    const capeCount = pack.capes?.length || pack.cape_count || 0;
+
+    return {
+        id: `pack-${pack.name}`,
+        packName: pack.name,
+        title: pack.display_name || pack.name,
+        description: pack.description || `包含 ${capeCount} 个能力`,
+        type: 'Pack',
+        author: 'Cape Service',
+        status: 'Operational',
+        price: 'Free',
+        capeCount,
+        tags: pack.tags || [],
+        coverImage,
+        icon,
+        color: pack.color || '#8B5CF6',
+        capes: pack.capes || [],
+    };
+}
+
+// Cape 执行类型到封面图的映射
+const capeCoverImages = {
+    xlsx: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop',
+    docx: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=800&auto=format&fit=crop',
+    pptx: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop',
+    pdf: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=800&auto=format&fit=crop',
+    default: 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=800&auto=format&fit=crop',
+};
+
+// 将 Cape API 数据转换为 Ground 卡片格式
+export function capeToGroundItem(cape) {
+    const coverImage = capeCoverImages[cape.id] || capeCoverImages.default;
+
+    return {
+        id: `cape-${cape.id}`,
+        capeId: cape.id,
+        title: cape.name,
+        description: cape.description,
+        type: 'Cape',
+        author: 'Cape Service',
+        status: 'Operational',
+        price: 'Free',
+        runCount: '-',
+        tags: cape.tags || [],
+        coverImage,
+        executionType: cape.execution_type,
+        riskLevel: cape.risk_level,
+        intentPatterns: cape.intent_patterns || [],
+        configFields: [
+            {
+                name: 'input',
+                type: 'textarea',
+                label: '输入内容',
+                description: '描述你想要完成的任务',
+                required: true,
+                defaultValue: '',
+            },
+        ],
+        examples: (cape.intent_patterns || []).slice(0, 3).map((pattern) => ({
+            prompt: pattern,
+            image: coverImage,
+        })),
+    };
+}

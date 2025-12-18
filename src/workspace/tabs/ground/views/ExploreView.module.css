@@ -321,3 +321,145 @@
     font-size: 0.8rem;
     color: var(--secondary);
 }
+
+/* Pack Grid */
+.packGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.packCard {
+    position: relative;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    outline: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.packCard:hover {
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    border-color: rgba(255, 255, 255, 0.7);
+}
+
+.packHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.packIcon {
+    font-size: 2rem;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.packBadge {
+    background: var(--secondary-light);
+    color: var(--secondary);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.packTitle {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--foreground);
+    margin: 0 0 0.5rem 0;
+}
+
+.packDesc {
+    font-size: 0.85rem;
+    color: var(--secondary);
+    line-height: 1.5;
+    margin: 0 0 1.25rem 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.packFooter {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    border-top: 1px solid var(--card-border);
+}
+
+.packStatus {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: #10b981;
+    font-weight: 500;
+}
+
+.packStatus::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+}
+
+.packArrow {
+    font-size: 1.25rem;
+    color: var(--secondary);
+    transition: transform 0.2s, color 0.2s;
+}
+
+.packCard:hover .packArrow {
+    transform: translateX(4px);
+    color: var(--primary);
+}
+
+/* Loading Placeholder */
+.loadingPlaceholder {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+}
+
+.loadingCard {
+    height: 120px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Empty State */
+.emptyState {
+    text-align: center;
+    padding: 3rem 2rem;
+    background: var(--secondary-light);
+    border-radius: 8px;
+    color: var(--secondary);
+}
+
+.emptyState p {
+    margin: 0;
+    font-size: 0.95rem;
+}

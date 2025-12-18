@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { HiPaperClip, HiWrench, HiTrash } from 'react-icons/hi2';
 import { IoSend } from 'react-icons/io5';
 import styles from './AgentTab.module.css';
 import { useSessionManager } from '@/hooks/useSessionManager';
+import { CapeConfigModal } from '@/components/cape';
 
 export default function AgentPage() {
     const chatEndRef = useRef(null);
@@ -18,6 +19,8 @@ export default function AgentPage() {
     const [currentStatus, setCurrentStatus] = useState(''); // 当前状态：thinking, generating, editing, responding
     const [error, setError] = useState(null);
     const [attachments, setAttachments] = useState([]);
+    const [showCapeConfig, setShowCapeConfig] = useState(false);
+    const [enabledCapes, setEnabledCapes] = useState(null); // null = all enabled
 
     // 使用会话管理hook
     const {
@@ -383,6 +386,11 @@ export default function AgentPage() {
         }
     };
 
+    // Cape 配置保存
+    const handleCapeConfigSave = useCallback((newEnabledCapes) => {
+        setEnabledCapes(newEnabledCapes);
+    }, []);
+
     return (
         <div className={styles.container}>
             {/* Left Sidebar: History */}
@@ -539,8 +547,15 @@ export default function AgentPage() {
                                 >
                                     <HiPaperClip size={18} />
                                 </button>
-                                <button className={styles.actionButton} title="工具">
+                                <button
+                                    className={styles.actionButton}
+                                    title="能力配置"
+                                    onClick={() => setShowCapeConfig(true)}
+                                >
                                     <HiWrench size={18} />
+                                    {enabledCapes && enabledCapes.size > 0 && (
+                                        <span className={styles.capeBadge}>{enabledCapes.size}</span>
+                                    )}
                                 </button>
                             </div>
                             <button
@@ -554,6 +569,14 @@ export default function AgentPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Cape 配置弹窗 */}
+            <CapeConfigModal
+                isOpen={showCapeConfig}
+                onClose={() => setShowCapeConfig(false)}
+                enabledCapes={enabledCapes}
+                onSave={handleCapeConfigSave}
+            />
         </div>
     );
 }

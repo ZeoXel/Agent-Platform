@@ -1,0 +1,421 @@
+.container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0;
+    height: calc(100vh - 64px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.splitLayout {
+    display: grid;
+    grid-template-columns: 450px 1fr;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Left Panel */
+.leftPanel {
+    background: white;
+    border-right: 1px solid var(--card-border);
+    padding: 2rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.backLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--secondary);
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    transition: color 0.2s;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.backLink:hover {
+    color: var(--primary);
+}
+
+.titleSection {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.headerRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.capeTitle {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--foreground);
+    line-height: 1.2;
+}
+
+.capeBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+}
+
+.badgeTool {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.badgeLlm {
+    background: #fffbeb;
+    color: #d97706;
+}
+
+.badgeHybrid {
+    background: #fdf2f8;
+    color: #db2777;
+}
+
+.badgeCode {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.capeMeta {
+    font-size: 0.9rem;
+    color: var(--secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.capeMeta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.capeDescription {
+    font-size: 0.9rem;
+    color: var(--secondary);
+    line-height: 1.5;
+}
+
+.configForm {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+.helperText {
+    font-size: 0.8rem;
+    color: var(--secondary);
+    margin-top: -0.25rem;
+}
+
+.textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    background: #fdfdfd;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    min-height: 120px;
+    resize: vertical;
+}
+
+.textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light);
+    outline: none;
+}
+
+/* File Upload */
+.fileUpload {
+    border: 2px dashed var(--card-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.fileUpload:hover {
+    border-color: var(--primary);
+    background: var(--primary-light);
+}
+
+.fileUpload.dragOver {
+    border-color: var(--primary);
+    background: var(--primary-light);
+}
+
+.uploadIcon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    color: var(--secondary);
+}
+
+.uploadText {
+    font-size: 0.9rem;
+    color: var(--secondary);
+}
+
+.uploadHint {
+    font-size: 0.75rem;
+    color: var(--secondary);
+    margin-top: 0.25rem;
+}
+
+.fileList {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.fileItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: var(--secondary-light);
+    border-radius: 6px;
+}
+
+.fileName {
+    font-size: 0.85rem;
+    color: var(--foreground);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.fileSize {
+    font-size: 0.75rem;
+    color: var(--secondary);
+}
+
+.removeFile {
+    background: none;
+    border: none;
+    color: var(--secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.removeFile:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.runButton {
+    margin-top: 1rem;
+    background: var(--foreground);
+    color: white;
+    border: none;
+    padding: 1rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.runButton:hover {
+    background: #333;
+    transform: translateY(-1px);
+}
+
+.runButton:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Right Panel */
+.rightPanel {
+    background: #f8fafc;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.outputContainer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.outputHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.outputTitle {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+.outputStatus {
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--secondary);
+}
+
+.statusDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+}
+
+.statusDot.running {
+    background: #3b82f6;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.outputContent {
+    flex: 1;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    padding: 1.5rem;
+    overflow-y: auto;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.outputContent.streaming {
+    border-color: var(--primary);
+}
+
+.emptyOutput {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--secondary);
+    text-align: center;
+}
+
+.emptyIcon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* Examples Section */
+.examplesSection {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--card-border);
+}
+
+.examplesTitle {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+}
+
+.examplesList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.exampleChip {
+    background: var(--secondary-light);
+    border: 1px solid var(--card-border);
+    padding: 0.5rem 0.75rem;
+    border-radius: 2rem;
+    font-size: 0.8rem;
+    color: var(--foreground);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.exampleChip:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* Loading Overlay */
+.loadingOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    z-index: 10;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--secondary-light);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

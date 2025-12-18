@@ -520,6 +520,27 @@
     color: var(--foreground);
 }
 
+.actionButton .capeBadge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 4px;
+    border-radius: 7px;
+    background: var(--primary);
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.actionButton {
+    position: relative;
+}
+
 .sendButton {
     background: transparent;
     color: var(--primary);

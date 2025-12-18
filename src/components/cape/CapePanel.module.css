@@ -1,0 +1,253 @@
+/* Cape 面板样式 */
+
+/* Backdrop */
+.backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.2);
+    z-index: 40;
+}
+
+/* Panel */
+.panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 20rem;
+    background: white;
+    border-left: 1px solid #e5e7eb;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(0);
+}
+
+.panel.hidden {
+    transform: translateX(100%);
+}
+
+/* Header */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.title {
+    font-weight: 600;
+    color: #111827;
+}
+
+.closeBtn {
+    padding: 0.25rem;
+    border-radius: 0.5rem;
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.closeBtn:hover {
+    background-color: #f3f4f6;
+    color: #374151;
+}
+
+.closeBtn svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+/* Search */
+.search {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.searchBox {
+    position: relative;
+}
+
+.searchIcon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1rem;
+    height: 1rem;
+    color: #9ca3af;
+}
+
+.searchInput {
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.searchInput:focus {
+    border-color: #3b82f6;
+}
+
+.searchInput::placeholder {
+    color: #9ca3af;
+}
+
+/* List */
+.list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.empty {
+    padding: 1rem;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.listInner {
+    padding: 0.5rem;
+}
+
+/* Cape Item */
+.item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.item:hover {
+    background-color: #f9fafb;
+}
+
+.itemIcon {
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background-color: #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.item:hover .itemIcon {
+    background-color: #eff6ff;
+}
+
+.itemIcon svg {
+    width: 1rem;
+    height: 1rem;
+    color: #6b7280;
+}
+
+.item:hover .itemIcon svg {
+    color: #2563eb;
+}
+
+.itemContent {
+    flex: 1;
+    min-width: 0;
+}
+
+.itemTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.itemName {
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.itemId {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-family: ui-monospace, monospace;
+}
+
+.itemDesc {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.125rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.itemTags {
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 0.375rem;
+}
+
+.itemTag {
+    padding: 0.125rem 0.375rem;
+    background-color: #f3f4f6;
+    border-radius: 0.25rem;
+    font-size: 0.625rem;
+    color: #6b7280;
+}
+
+.itemArrow {
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    color: #d1d5db;
+    margin-top: 0.25rem;
+}
+
+.item:hover .itemArrow {
+    color: #6b7280;
+}
+
+/* Footer */
+.footer {
+    padding: 0.75rem;
+    border-top: 1px solid #f3f4f6;
+    text-align: center;
+    font-size: 0.75rem;
+    color: #9ca3af;
+}
+
+/* Animation helper (for JS-based animation) */
+.fadeIn {
+    animation: fadeIn 0.2s ease;
+}
+
+.slideIn {
+    animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
