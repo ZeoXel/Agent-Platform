@@ -203,7 +203,7 @@ export default function AgentPage() {
         setError(null);
 
         try {
-            const response = await fetch('/api/agent', {
+            const response = await fetch('/api/agent-v2', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

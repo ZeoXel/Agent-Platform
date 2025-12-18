@@ -1,0 +1,92 @@
+/* GlassCard - 毛玻璃卡片组件 */
+.card {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Variants */
+.variant-default {
+    background: rgba(255, 255, 255, 0.65);
+}
+
+.variant-light {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.variant-primary {
+    background: rgba(37, 99, 235, 0.15);
+}
+
+.variant-transparent {
+    background: transparent;
+}
+
+/* Blur */
+.blur-sm {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.blur-md {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.blur-lg {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+/* Padding */
+.padding-sm {
+    padding: 0.5rem;
+}
+
+.padding-md {
+    padding: 0.75rem 1rem;
+}
+
+.padding-lg {
+    padding: 1rem 1.5rem;
+}
+
+.padding-xl {
+    padding: 1.5rem 2rem;
+}
+
+/* Rounded */
+.rounded-sm {
+    border-radius: 6px;
+}
+
+.rounded-md {
+    border-radius: 12px;
+}
+
+.rounded-lg {
+    border-radius: 16px;
+}
+
+.rounded-full {
+    border-radius: 9999px;
+}
+
+/* Border */
+.border {
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Hover Effect */
+.hover:hover {
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+.variant-primary.hover:hover {
+    background: rgba(37, 99, 235, 0.2);
+}
+
+/* Shadow */
+.card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}

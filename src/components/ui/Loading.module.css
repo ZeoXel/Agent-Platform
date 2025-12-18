@@ -1,0 +1,141 @@
+/* Loading - 加载状态组件 */
+
+/* Spinner */
+.spinner {
+    display: inline-block;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.spinner-sm {
+    width: 14px;
+    height: 14px;
+}
+
+.spinner-md {
+    width: 18px;
+    height: 18px;
+}
+
+.spinner-lg {
+    width: 24px;
+    height: 24px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Loading Bubble */
+.bubble {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--secondary);
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 20px;
+    width: fit-content;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+/* Status Text with Shimmer */
+.statusText {
+    display: inline-block;
+    position: relative;
+    background: linear-gradient(90deg,
+            rgba(100, 116, 139, 0.3) 0%,
+            rgba(100, 116, 139, 0.8) 25%,
+            rgba(255, 255, 255, 1) 50%,
+            rgba(100, 116, 139, 0.8) 75%,
+            rgba(100, 116, 139, 0.3) 100%);
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmerEffect 3s ease-in-out infinite;
+}
+
+/* Shimmer Dots */
+.shimmer {
+    display: inline-block;
+    position: relative;
+    background: linear-gradient(90deg,
+            rgba(100, 116, 139, 0.3) 0%,
+            rgba(100, 116, 139, 0.8) 25%,
+            rgba(255, 255, 255, 1) 50%,
+            rgba(100, 116, 139, 0.8) 75%,
+            rgba(100, 116, 139, 0.3) 100%);
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmerEffect 8s ease-in-out infinite;
+    letter-spacing: 0.1em;
+}
+
+@keyframes shimmerEffect {
+    0% {
+        background-position: 200% center;
+    }
+
+    100% {
+        background-position: -200% center;
+    }
+}
+
+/* Shimmer Text */
+.shimmerText {
+    display: inline-block;
+    background: linear-gradient(90deg,
+            var(--foreground) 0%,
+            var(--secondary) 50%,
+            var(--foreground) 100%);
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmerEffect 2s ease-in-out infinite;
+}
+
+/* Skeleton */
+.skeleton {
+    display: inline-block;
+    background: linear-gradient(90deg,
+            rgba(0, 0, 0, 0.06) 0%,
+            rgba(0, 0, 0, 0.1) 50%,
+            rgba(0, 0, 0, 0.06) 100%);
+    background-size: 200% 100%;
+    animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-text {
+    height: 1em;
+    border-radius: 4px;
+    width: 100%;
+}
+
+.skeleton-circle {
+    border-radius: 50%;
+}
+
+.skeleton-rect {
+    border-radius: 8px;
+}
+
+@keyframes skeletonPulse {
+    0% {
+        background-position: 200% center;
+    }
+
+    100% {
+        background-position: -200% center;
+    }
+}

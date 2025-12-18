@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   /* Blue/White Minimalist Palette */
   --background: #f8fafc;
@@ -81,4 +85,19 @@ h6 {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--secondary);
+}
+
+.connection-preview-line {
+  stroke-dasharray: 14;
+  animation: connection-dash 0.8s linear infinite;
+  filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.25));
+}
+
+@keyframes connection-dash {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -28;
+  }
 }

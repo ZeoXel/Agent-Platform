@@ -1,0 +1,75 @@
+/* ListItem - 列表项组件 */
+
+/* List Container */
+.list {
+    display: flex;
+    flex-direction: column;
+}
+
+.gap-sm {
+    gap: 0.25rem;
+}
+
+.gap-md {
+    gap: 0.5rem;
+}
+
+/* List Item */
+.item {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--foreground);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background 0.2s, color 0.2s;
+}
+
+/* Hoverable */
+.hoverable:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Active */
+.active {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.active:hover {
+    background: rgba(37, 99, 235, 0.15);
+}
+
+/* Content */
+.content {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Prefix & Suffix */
+.prefix {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.suffix {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.item:hover .suffix {
+    opacity: 1;
+}
+
+.active .suffix {
+    opacity: 1;
+}

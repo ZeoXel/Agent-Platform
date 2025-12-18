@@ -1,0 +1,318 @@
+{
+  "data": {
+    "edges": [],
+    "nodes": [
+      {
+        "data": {
+          "node": {
+            "template": {
+              "_type": "Component",
+              "_classes": {
+                "tool_mode": false,
+                "trace_as_input": true,
+                "trace_as_metadata": true,
+                "load_from_db": false,
+                "list": false,
+                "list_add_label": "Add More",
+                "required": false,
+                "placeholder": "",
+                "show": true,
+                "name": "_classes",
+                "value": "[]",
+                "display_name": "Classes",
+                "advanced": true,
+                "input_types": [
+                  "Message"
+                ],
+                "dynamic": false,
+                "info": "",
+                "title_case": false,
+                "type": "str",
+                "_input_type": "MessageTextInput"
+              },
+              "_functions": {
+                "tool_mode": false,
+                "trace_as_input": true,
+                "trace_as_metadata": true,
+                "load_from_db": false,
+                "list": false,
+                "list_add_label": "Add More",
+                "required": false,
+                "placeholder": "",
+                "show": true,
+                "name": "_functions",
+                "value": "{\"edit_image\": {\"name\": \"edit_image\", \"args\": [{\"name\": \"prompt\", \"annotation\": \"str\", \"default\": null}, {\"name\": \"image_url\", \"annotation\": \"str\", \"default\": null}, {\"name\": \"response_format\", \"annotation\": \"str\", \"default\": null}]}}",
+                "display_name": "Functions",
+                "advanced": true,
+                "input_types": [
+                  "Message"
+                ],
+                "dynamic": false,
+                "info": "",
+                "title_case": false,
+                "type": "str",
+                "_input_type": "MessageTextInput"
+              },
+              "code": {
+                "type": "code",
+                "required": true,
+                "placeholder": "",
+                "list": false,
+                "show": true,
+                "multiline": true,
+                "value": "import ast\nimport json\nfrom typing import Any\n\nfrom langchain.agents import Tool\nfrom langchain_core.tools import StructuredTool\nfrom pydantic.v1 import Field, create_model\nfrom pydantic.v1.fields import Undefined\nfrom typing_extensions import override\n\nfrom langflow.base.langchain_utilities.model import LCToolComponent\nfrom langflow.inputs.inputs import BoolInput, DropdownInput, FieldTypes, HandleInput, MessageTextInput, MultilineInput\nfrom langflow.io import Output\nfrom langflow.logging.logger import logger\nfrom langflow.schema.data import Data\nfrom langflow.schema.dotdict import dotdict\n\n\nclass PythonCodeStructuredTool(LCToolComponent):\n    DEFAULT_KEYS = [\n        \"code\",\n        \"_type\",\n        \"text_key\",\n        \"tool_code\",\n        \"tool_name\",\n        \"tool_description\",\n        \"return_direct\",\n        \"tool_function\",\n        \"global_variables\",\n        \"_classes\",\n        \"_functions\",\n    ]\n    display_name = \"Python Code Structured\"\n    description = \"structuredtool dataclass code to tool\"\n    documentation = \"https://python.langchain.com/docs/modules/tools/custom_tools/#structuredtool-dataclass\"\n    name = \"PythonCodeStructuredTool\"\n    icon = \"Python\"\n    field_order = [\"name\", \"description\", \"tool_code\", \"return_direct\", \"tool_function\"]\n    legacy: bool = True\n    replacement = [\"processing.PythonREPLComponent\"]\n\n    inputs = [\n        MultilineInput(\n            name=\"tool_code\",\n            display_name=\"Tool Code\",\n            info=\"Enter the dataclass code.\",\n            placeholder=\"def my_function(args):\\n    pass\",\n            required=True,\n            real_time_refresh=True,\n            refresh_button=True,\n        ),\n        MessageTextInput(\n            name=\"tool_name\",\n            display_name=\"Tool Name\",\n            info=\"Enter the name of the tool.\",\n            required=True,\n        ),\n        MessageTextInput(\n            name=\"tool_description\",\n            display_name=\"Description\",\n            info=\"Enter the description of the tool.\",\n            required=True,\n        ),\n        BoolInput(\n            name=\"return_direct\",\n            display_name=\"Return Directly\",\n            info=\"Should the tool return the function output directly?\",\n        ),\n        DropdownInput(\n            name=\"tool_function\",\n            display_name=\"Tool Function\",\n            info=\"Select the function for additional expressions.\",\n            options=[],\n            required=True,\n            real_time_refresh=True,\n            refresh_button=True,\n        ),\n        HandleInput(\n            name=\"global_variables\",\n            display_name=\"Global Variables\",\n            info=\"Enter the global variables or Create Data Component.\",\n            input_types=[\"Data\"],\n            field_type=FieldTypes.DICT,\n            is_list=True,\n        ),\n        MessageTextInput(name=\"_classes\", display_name=\"Classes\", advanced=True),\n        MessageTextInput(name=\"_functions\", display_name=\"Functions\", advanced=True),\n    ]\n\n    outputs = [\n        Output(display_name=\"Tool\", name=\"result_tool\", method=\"build_tool\"),\n    ]\n\n    @override\n    async def update_build_config(\n        self, build_config: dotdict, field_value: Any, field_name: str | None = None\n    ) -> dotdict:\n        if field_name is None:\n            return build_config\n\n        if field_name not in {\"tool_code\", \"tool_function\"}:\n            return build_config\n\n        try:\n            named_functions = {}\n            [classes, functions] = self._parse_code(build_config[\"tool_code\"][\"value\"])\n            existing_fields = {}\n            if len(build_config) > len(self.DEFAULT_KEYS):\n                for key in build_config.copy():\n                    if key not in self.DEFAULT_KEYS:\n                        existing_fields[key] = build_config.pop(key)\n\n            names = []\n            for func in functions:\n                named_functions[func[\"name\"]] = func\n                names.append(func[\"name\"])\n\n                for arg in func[\"args\"]:\n                    field_name = f\"{func['name']}|{arg['name']}\"\n                    if field_name in existing_fields:\n                        build_config[field_name] = existing_fields[field_name]\n                        continue\n\n                    field = MessageTextInput(\n                        display_name=f\"{arg['name']}: Description\",\n                        name=field_name,\n                        info=f\"Enter the description for {arg['name']}\",\n                        required=True,\n                    )\n                    build_config[field_name] = field.to_dict()\n            build_config[\"_functions\"][\"value\"] = json.dumps(named_functions)\n            build_config[\"_classes\"][\"value\"] = json.dumps(classes)\n            build_config[\"tool_function\"][\"options\"] = names\n        except Exception as e:  # noqa: BLE001\n            self.status = f\"Failed to extract names: {e}\"\n            logger.debug(self.status, exc_info=True)\n            build_config[\"tool_function\"][\"options\"] = [\"Failed to parse\", str(e)]\n        return build_config\n\n    async def build_tool(self) -> Tool:\n        local_namespace = {}  # type: ignore[var-annotated]\n        modules = self._find_imports(self.tool_code)\n        import_code = \"\"\n        for module in modules[\"imports\"]:\n            import_code += f\"global {module}\\nimport {module}\\n\"\n        for from_module in modules[\"from_imports\"]:\n            for alias in from_module.names:\n                import_code += f\"global {alias.name}\\n\"\n            import_code += (\n                f\"from {from_module.module} import {', '.join([alias.name for alias in from_module.names])}\\n\"\n            )\n        exec(import_code, globals())\n        exec(self.tool_code, globals(), local_namespace)\n\n        class PythonCodeToolFunc:\n            params: dict = {}\n\n            def run(**kwargs):\n                for key, arg in kwargs.items():\n                    if key not in PythonCodeToolFunc.params:\n                        PythonCodeToolFunc.params[key] = arg\n                return local_namespace[self.tool_function](**PythonCodeToolFunc.params)\n\n        globals_ = globals()\n        local = {}\n        local[self.tool_function] = PythonCodeToolFunc\n        globals_.update(local)\n\n        if isinstance(self.global_variables, list):\n            for data in self.global_variables:\n                if isinstance(data, Data):\n                    globals_.update(data.data)\n        elif isinstance(self.global_variables, dict):\n            globals_.update(self.global_variables)\n\n        classes = json.loads(self._attributes[\"_classes\"])\n        for class_dict in classes:\n            exec(\"\\n\".join(class_dict[\"code\"]), globals_)\n\n        named_functions = json.loads(self._attributes[\"_functions\"])\n        schema_fields = {}\n\n        for attr in self._attributes:\n            if attr in self.DEFAULT_KEYS:\n                continue\n\n            func_name = attr.split(\"|\")[0]\n            field_name = attr.split(\"|\")[1]\n            func_arg = self._find_arg(named_functions, func_name, field_name)\n            if func_arg is None:\n                msg = f\"Failed to find arg: {field_name}\"\n                raise ValueError(msg)\n\n            field_annotation = func_arg[\"annotation\"]\n            field_description = self._get_value(self._attributes[attr], str)\n\n            if field_annotation:\n                exec(f\"temp_annotation_type = {field_annotation}\", globals_)\n                schema_annotation = globals_[\"temp_annotation_type\"]\n            else:\n                schema_annotation = Any\n            schema_fields[field_name] = (\n                schema_annotation,\n                Field(\n                    default=func_arg.get(\"default\", Undefined),\n                    description=field_description,\n                ),\n            )\n\n        if \"temp_annotation_type\" in globals_:\n            globals_.pop(\"temp_annotation_type\")\n\n        python_code_tool_schema = None\n        if schema_fields:\n            python_code_tool_schema = create_model(\"PythonCodeToolSchema\", **schema_fields)\n\n        return StructuredTool.from_function(\n            func=local[self.tool_function].run,\n            args_schema=python_code_tool_schema,\n            name=self.tool_name,\n            description=self.tool_description,\n            return_direct=self.return_direct,\n        )\n\n    async def update_frontend_node(self, new_frontend_node: dict, current_frontend_node: dict):\n        \"\"\"This function is called after the code validation is done.\"\"\"\n        frontend_node = await super().update_frontend_node(new_frontend_node, current_frontend_node)\n        frontend_node[\"template\"] = await self.update_build_config(\n            frontend_node[\"template\"],\n            frontend_node[\"template\"][\"tool_code\"][\"value\"],\n            \"tool_code\",\n        )\n        frontend_node = await super().update_frontend_node(new_frontend_node, current_frontend_node)\n        for key in frontend_node[\"template\"]:\n            if key in self.DEFAULT_KEYS:\n                continue\n            frontend_node[\"template\"] = await self.update_build_config(\n                frontend_node[\"template\"], frontend_node[\"template\"][key][\"value\"], key\n            )\n            frontend_node = await super().update_frontend_node(new_frontend_node, current_frontend_node)\n        return frontend_node\n\n    def _parse_code(self, code: str) -> tuple[list[dict], list[dict]]:\n        parsed_code = ast.parse(code)\n        lines = code.split(\"\\n\")\n        classes = []\n        functions = []\n        for node in parsed_code.body:\n            if isinstance(node, ast.ClassDef):\n                class_lines = lines[node.lineno - 1 : node.end_lineno]\n                class_lines[-1] = class_lines[-1][: node.end_col_offset]\n                class_lines[0] = class_lines[0][node.col_offset :]\n                classes.append(\n                    {\n                        \"name\": node.name,\n                        \"code\": class_lines,\n                    }\n                )\n                continue\n\n            if not isinstance(node, ast.FunctionDef):\n                continue\n\n            func = {\"name\": node.name, \"args\": []}\n            for arg in node.args.args:\n                if arg.lineno != arg.end_lineno:\n                    msg = \"Multiline arguments are not supported\"\n                    raise ValueError(msg)\n\n                func_arg = {\n                    \"name\": arg.arg,\n                    \"annotation\": None,\n                }\n\n                for default in node.args.defaults:\n                    if (\n                        arg.lineno > default.lineno\n                        or arg.col_offset > default.col_offset\n                        or (\n                            arg.end_lineno is not None\n                            and default.end_lineno is not None\n                            and arg.end_lineno < default.end_lineno\n                        )\n                        or (\n                            arg.end_col_offset is not None\n                            and default.end_col_offset is not None\n                            and arg.end_col_offset < default.end_col_offset\n                        )\n                    ):\n                        continue\n\n                    if isinstance(default, ast.Name):\n                        func_arg[\"default\"] = default.id\n                    elif isinstance(default, ast.Constant):\n                        func_arg[\"default\"] = str(default.value) if default.value is not None else None\n\n                if arg.annotation:\n                    annotation_line = lines[arg.annotation.lineno - 1]\n                    annotation_line = annotation_line[: arg.annotation.end_col_offset]\n                    annotation_line = annotation_line[arg.annotation.col_offset :]\n                    func_arg[\"annotation\"] = annotation_line\n                    if isinstance(func_arg[\"annotation\"], str) and func_arg[\"annotation\"].count(\"=\") > 0:\n                        func_arg[\"annotation\"] = \"=\".join(func_arg[\"annotation\"].split(\"=\")[:-1]).strip()\n                if isinstance(func[\"args\"], list):\n                    func[\"args\"].append(func_arg)\n            functions.append(func)\n\n        return classes, functions\n\n    def _find_imports(self, code: str) -> dotdict:\n        imports: list[str] = []\n        from_imports = []\n        parsed_code = ast.parse(code)\n        for node in parsed_code.body:\n            if isinstance(node, ast.Import):\n                imports.extend(alias.name for alias in node.names)\n            elif isinstance(node, ast.ImportFrom):\n                from_imports.append(node)\n        return dotdict({\"imports\": imports, \"from_imports\": from_imports})\n\n    def _get_value(self, value: Any, annotation: Any) -> Any:\n        return value if isinstance(value, annotation) else value[\"value\"]\n\n    def _find_arg(self, named_functions: dict, func_name: str, arg_name: str) -> dict | None:\n        for arg in named_functions[func_name][\"args\"]:\n            if arg[\"name\"] == arg_name:\n                return arg\n        return None\n",
+                "fileTypes": [],
+                "file_path": "",
+                "password": false,
+                "name": "code",
+                "advanced": true,
+                "dynamic": true,
+                "info": "",
+                "load_from_db": false,
+                "title_case": false
+              },
+              "global_variables": {
+                "trace_as_metadata": true,
+                "list": true,
+                "list_add_label": "Add More",
+                "required": false,
+                "placeholder": "",
+                "show": true,
+                "name": "global_variables",
+                "value": "",
+                "display_name": "Global Variables",
+                "advanced": false,
+                "input_types": [
+                  "Data"
+                ],
+                "dynamic": false,
+                "info": "Enter the global variables or Create Data Component.",
+                "title_case": false,
+                "type": "dict",
+                "_input_type": "HandleInput"
+              },
+              "return_direct": {
+                "tool_mode": false,
+                "trace_as_metadata": true,
+                "list": false,
+                "list_add_label": "Add More",
+                "required": false,
+                "placeholder": "",
+                "show": true,
+                "name": "return_direct",
+                "value": false,
+                "display_name": "Return Directly",
+                "advanced": false,
+                "dynamic": false,
+                "info": "Should the tool return the function output directly?",
+                "title_case": false,
+                "type": "bool",
+                "_input_type": "BoolInput"
+              },
+              "tool_code": {
+                "tool_mode": false,
+                "trace_as_input": true,
+                "multiline": true,
+                "trace_as_metadata": true,
+                "load_from_db": false,
+                "list": false,
+                "list_add_label": "Add More",
+                "required": true,
+                "placeholder": "def my_function(args):\n    pass",
+                "show": true,
+                "name": "tool_code",
+                "value": "import os\nimport requests\nimport json\nfrom typing import Optional\n\ndef edit_image(prompt: str, image_url: str, response_format: str = \"url\") -> str:\n    \"\"\"\n    Edit an existing image based on a prompt.\n    \"\"\"\n    api_key = os.getenv(\"OPENAI_API_KEY\")\n    base_url = os.getenv(\"OPENAI_BASE_URL\", \"https://api.openai.com\")\n    \n    if not api_key:\n        return json.dumps({\"error\": \"Missing OPENAI_API_KEY\"})\n\n    # Download image\n    try:\n        img_res = requests.get(image_url)\n        if img_res.status_code != 200:\n             return json.dumps({\"error\": f\"Failed to download image: {img_res.status_code}\"})\n    except Exception as e:\n        return json.dumps({\"error\": f\"Download error: {str(e)}\"})\n\n    url = f\"{base_url}/v1/images/edits\"\n    headers = {\n        \"Authorization\": f\"Bearer {api_key}\"\n    }\n    \n    files = {\n        \"image\": (\"image.png\", img_res.content, \"image/png\"),\n        \"model\": (None, \"nano-banana-2\"),\n        \"prompt\": (None, prompt),\n    }\n    if response_format:\n        files[\"response_format\"] = (None, response_format)\n\n    try:\n        response = requests.post(url, headers=headers, files=files)\n        if response.status_code != 200:\n             return json.dumps({\"error\": f\"Error {response.status_code}: {response.text}\"})\n        \n        return json.dumps(response.json())\n    except Exception as e:\n        return json.dumps({\"error\": str(e)})\n",
+                "display_name": "Tool Code",
+                "advanced": false,
+                "input_types": [
+                  "Message"
+                ],
+                "dynamic": false,
+                "info": "Enter the dataclass code.",
+                "real_time_refresh": true,
+                "refresh_button": true,
+                "title_case": false,
+                "copy_field": false,
+                "type": "str",
+                "_input_type": "MultilineInput"
+              },
+              "tool_description": {
+                "tool_mode": false,
+                "trace_as_input": true,
+                "trace_as_metadata": true,
+                "load_from_db": false,
+                "list": false,
+                "list_add_label": "Add More",
+                "required": true,
+                "placeholder": "",
+                "show": true,
+                "name": "tool_description",
+                "value": "Edit existing images using nano-banana-2 model.",
+                "display_name": "Description",
+                "advanced": false,
+                "input_types": [
+                  "Message"
+                ],
+                "dynamic": false,
+                "info": "Enter the description of the tool.",
+                "title_case": false,
+                "type": "str",
+                "_input_type": "MessageTextInput"
+              },
+              "tool_function": {
+                "tool_mode": false,
+                "trace_as_metadata": true,
+                "options": [
+                  "edit_image"
+                ],
+                "options_metadata": [],
+                "combobox": false,
+                "dialog_inputs": {},
+                "toggle": false,
+                "required": true,
+                "placeholder": "",
+                "show": true,
+                "name": "tool_function",
+                "value": "edit_image",
+                "display_name": "Tool Function",
+                "advanced": false,
+                "dynamic": false,
+                "info": "Select the function for additional expressions.",
+                "real_time_refresh": true,
+                "refresh_button": true,
+                "title_case": false,
+                "external_options": {},
+                "type": "str",
+                "_input_type": "DropdownInput"
+              },
+              "tool_name": {
+                "tool_mode": false,
+                "trace_as_input": true,
+                "trace_as_metadata": true,
+                "load_from_db": false,
+                "list": false,
+                "list_add_label": "Add More",
+                "required": true,
+                "placeholder": "",
+                "show": true,
+                "name": "tool_name",
+                "value": "edit_image",
+                "display_name": "Tool Name",
+                "advanced": false,
+                "input_types": [
+                  "Message"
+                ],
+                "dynamic": false,
+                "info": "Enter the name of the tool.",
+                "title_case": false,
+                "type": "str",
+                "_input_type": "MessageTextInput"
+              },
+              "edit_image|prompt": {
+                "type": "str",
+                "value": "Instructions for editing",
+                "show": true,
+                "name": "edit_image|prompt",
+                "display_name": "prompt: Description",
+                "info": "Enter the description for prompt",
+                "required": true,
+                "_input_type": "MessageTextInput"
+              },
+              "edit_image|image_url": {
+                "type": "str",
+                "value": "URL of the image to edit",
+                "show": true,
+                "name": "edit_image|image_url",
+                "display_name": "image_url: Description",
+                "info": "Enter the description for image_url",
+                "required": true,
+                "_input_type": "MessageTextInput"
+              },
+              "edit_image|response_format": {
+                "type": "str",
+                "value": "url or b64_json",
+                "show": true,
+                "name": "edit_image|response_format",
+                "display_name": "response_format: Description",
+                "info": "Enter the description for response_format",
+                "required": true,
+                "_input_type": "MessageTextInput"
+              }
+            },
+            "description": "Edit existing images using nano-banana-2 model.",
+            "icon": "Python",
+            "base_classes": [
+              "Tool"
+            ],
+            "display_name": "Edit Image",
+            "documentation": "https://python.langchain.com/docs/modules/tools/custom_tools/#structuredtool-dataclass",
+            "minimized": false,
+            "custom_fields": {},
+            "output_types": [],
+            "pinned": false,
+            "conditional_paths": [],
+            "frozen": false,
+            "outputs": [
+              {
+                "types": [
+                  "Tool"
+                ],
+                "selected": "Tool",
+                "name": "result_tool",
+                "display_name": "Tool",
+                "method": "build_tool",
+                "value": "__UNDEFINED__",
+                "cache": true,
+                "required_inputs": null,
+                "allows_loop": false,
+                "group_outputs": false,
+                "options": null,
+                "tool_mode": true
+              }
+            ],
+            "field_order": [
+              "tool_code",
+              "tool_name",
+              "tool_description",
+              "return_direct",
+              "tool_function",
+              "global_variables",
+              "_classes",
+              "_functions"
+            ],
+            "beta": false,
+            "legacy": true,
+            "replacement": [
+              "processing.PythonREPLComponent"
+            ],
+            "edited": false,
+            "metadata": {},
+            "tool_mode": false,
+            "last_updated": "2025-12-11T09:04:06.778Z",
+            "official": false,
+            "id": "PythonCodeStructuredTool-4da1b"
+          },
+          "showNode": true,
+          "type": "PythonCodeStructuredTool",
+          "id": "PythonCodeStructuredTool-4da1b"
+        },
+        "id": "PythonCodeStructuredTool-4da1b",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "type": "genericNode"
+      }
+    ],
+    "viewport": {
+      "x": 1,
+      "y": 1,
+      "zoom": 1
+    }
+  },
+  "description": "Edit existing images using nano-banana-2 model.",
+  "name": "Edit Image",
+  "id": "PythonCodeStructuredTool-4da1b",
+  "is_component": true,
+  "last_tested_version": "1.6.8"
+}
