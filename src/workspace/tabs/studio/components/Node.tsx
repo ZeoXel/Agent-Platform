@@ -349,7 +349,7 @@ const NodeComponent: React.FC<NodeProps> = ({
 
   const handleMouseEnter = () => {
     isHoveringRef.current = true;
-    if(node.data.images?.length > 1 || (node.data.videoUris && node.data.videoUris.length > 1)) setShowImageGrid(true);
+    if((node.data.images?.length ?? 0) > 1 || (node.data.videoUris && node.data.videoUris.length > 1)) setShowImageGrid(true);
     
     // Play Video on Hover
     if (mediaRef.current instanceof HTMLVideoElement) {

@@ -30,6 +30,32 @@
   --card-shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.05);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /*
+   * Glass Effect Design System
+   *
+   * 标准玻璃态样式规范（直接在组件CSS中使用）：
+   *
+   * 背景渐变:
+   *   default: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.15) 100%)
+   *   light:   linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%)
+   *   strong:  linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.25) 100%)
+   *   primary: linear-gradient(135deg, rgba(37,99,235,0.2) 0%, rgba(37,99,235,0.08) 100%)
+   *
+   * 模糊强度:
+   *   sm: backdrop-filter: blur(12px)
+   *   md: backdrop-filter: blur(20px)
+   *   lg: backdrop-filter: blur(24px)
+   *
+   * 边框:
+   *   default: 1px solid rgba(255,255,255,0.3)
+   *   light:   1px solid rgba(255,255,255,0.25)
+   *
+   * 阴影:
+   *   default: 0 4px 16px rgba(0,0,0,0.08)
+   *   hover:   0 8px 24px rgba(0,0,0,0.12)
+   *   focus:   0 12px 32px rgba(0,0,0,0.15)
+   */
 }
 
 html {

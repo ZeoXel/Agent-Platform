@@ -28,7 +28,7 @@ const COLLISION_PADDING = 24; // Spacing when nodes bounce off each other
 // Helper to get image dimensions
 const getImageDimensions = (src: string): Promise<{width: number, height: number}> => {
     return new Promise((resolve, reject) => {
-        const img = new Image();
+        const img = new window.Image();
         img.onload = () => resolve({width: img.width, height: img.height});
         img.onerror = reject;
         img.src = src;
@@ -265,7 +265,8 @@ export default function StudioTab() {
 
   // --- Persistence ---
   useEffect(() => {
-      if (window.aistudio) window.aistudio.hasSelectedApiKey().then(hasKey => { if (!hasKey) window.aistudio.openSelectKey(); });
+      const win = window as any;
+      if (win.aistudio) win.aistudio.hasSelectedApiKey().then((hasKey: boolean) => { if (!hasKey) win.aistudio.openSelectKey(); });
       const loadData = async () => {
           try {
             const sAssets = await loadFromStorage<any[]>('assets'); if (sAssets) setAssetHistory(sAssets);
@@ -781,7 +782,7 @@ export default function StudioTab() {
                       console.warn("Storyboard planning failed", e);
                   }
                }
-              const res = await generateImageFromText(prompt, node.data.model, inputImages, { aspectRatio: node.data.aspectRatio || '16:9', resolution: node.data.resolution, count: node.data.imageCount });
+              const res = await generateImageFromText(prompt, node.data.model || 'gemini-2.5-flash-image', inputImages, { aspectRatio: node.data.aspectRatio || '16:9', resolution: node.data.resolution, count: node.data.imageCount });
               handleNodeUpdate(id, { image: res[0], images: res });
 
           } else if (node.type === NodeType.VIDEO_GENERATOR) {
@@ -790,15 +791,15 @@ export default function StudioTab() {
               
               const res = await generateVideo(
                   strategy.finalPrompt,
-                  node.data.model, 
-                  { 
-                      aspectRatio: node.data.aspectRatio || '16:9', 
-                      count: node.data.videoCount || 1, 
+                  node.data.model || 'veo-2.0-generate-001',
+                  {
+                      aspectRatio: node.data.aspectRatio || '16:9',
+                      count: node.data.videoCount || 1,
                       generationMode: strategy.generationMode,
-                      resolution: node.data.resolution 
-                  }, 
-                  strategy.inputImageForGeneration, 
-                  strategy.videoInput, 
+                      resolution: node.data.resolution
+                  },
+                  strategy.inputImageForGeneration,
+                  strategy.videoInput,
                   strategy.referenceImages
               );
               
@@ -823,13 +824,13 @@ export default function StudioTab() {
              if (!vid) throw new Error("未找到视频输入");
              let vidData = vid;
              if (vid.startsWith('http')) vidData = await urlToBase64(vid);
-             const txt = await analyzeVideo(vidData, prompt, node.data.model);
+             const txt = await analyzeVideo(vidData, prompt, node.data.model || 'gemini-2.5-flash');
              handleNodeUpdate(id, { analysis: txt });
           } else if (node.type === NodeType.IMAGE_EDITOR) {
              const inputImages: string[] = [];
              inputs.forEach(n => { if (n?.data.image) inputImages.push(n.data.image); });
              const img = node.data.image || inputImages[0];
-             const res = await editImageWithText(img, prompt, node.data.model);
+             const res = await editImageWithText(img, prompt, node.data.model || 'gemini-2.5-flash-image');
              handleNodeUpdate(id, { image: res });
           }
           setNodes(p => p.map(n => n.id === id ? { ...n, status: NodeStatus.SUCCESS } : n));
@@ -859,7 +860,8 @@ export default function StudioTab() {
       setWorkflows(prev => [newWf, ...prev]);
   };
 
-  const loadWorkflow = (id: string) => {
+  const loadWorkflow = (id: string | null) => {
+      if (!id) return;
       const wf = workflows.find(w => w.id === id);
       if (wf) { saveHistory(); setNodes(JSON.parse(JSON.stringify(wf.nodes))); setConnections(JSON.parse(JSON.stringify(wf.connections))); setGroups(JSON.parse(JSON.stringify(wf.groups))); setSelectedWorkflowId(id); }
   };
@@ -903,7 +905,7 @@ export default function StudioTab() {
               const offsetX = dropX - (minX + width/2);
               const offsetY = dropY - (minY + height/2);
               const idMap = new Map<string, string>();
-              const newNodes = wf.nodes.map(n => { const newId = `n-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`; idMap.set(n.id, newId); return { ...n, id: newId, x: n.x + offsetX, y: n.y + offsetY, status: NodeStatus.IDLE, inputs: [] }; });
+              const newNodes = wf.nodes.map(n => { const newId = `n-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`; idMap.set(n.id, newId); return { ...n, id: newId, x: n.x + offsetX, y: n.y + offsetY, status: NodeStatus.IDLE, inputs: [] as string[] }; });
               newNodes.forEach((n, i) => { const original = wf.nodes[i]; n.inputs = original.inputs.map(oldId => idMap.get(oldId)).filter(Boolean) as string[]; });
               const newConnections = wf.connections.map(c => ({ from: idMap.get(c.from)!, to: idMap.get(c.to)! })).filter(c => c.from && c.to);
               const newGroups = (wf.groups || []).map(g => ({ ...g, id: `g-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, x: g.x + offsetX, y: g.y + offsetY }));
@@ -1139,7 +1141,7 @@ export default function StudioTab() {
                           <button className="w-full text-left px-3 py-2 text-xs font-medium text-slate-600 hover:bg-cyan-500/20 hover:text-blue-600 rounded-lg flex items-center gap-2 transition-colors" onClick={() => { const targetNode = nodes.find(n => n.id === contextMenu.id); if (targetNode) setClipboard(JSON.parse(JSON.stringify(targetNode))); setContextMenu(null); }}>
                               <Copy size={12} /> 复制节点
                           </button>
-                          {(() => { const targetNode = nodes.find(n => n.id === contextMenu.id); if (targetNode) { const isVideo = targetNode.type === NodeType.VIDEO_GENERATOR || targetNode.type === NodeType.VIDEO_ANALYZER; const isImage = targetNode.type === NodeType.IMAGE_GENERATOR || targetNode.type === NodeType.IMAGE_EDITOR; if (isVideo || isImage) { return ( <button className="w-full text-left px-3 py-2 text-xs font-medium text-slate-600 hover:bg-purple-500/20 hover:text-purple-400 rounded-lg flex items-center gap-2 transition-colors" onClick={() => { replacementTargetRef.current = contextMenu.id; if (isVideo) replaceVideoInputRef.current?.click(); else replaceImageInputRef.current?.click(); setContextMenu(null); }}> <RefreshCw size={12} /> 替换素材 </button> ); } } return null; })()}
+                          {(() => { const targetNode = nodes.find(n => n.id === contextMenu.id); if (targetNode) { const isVideo = targetNode.type === NodeType.VIDEO_GENERATOR || targetNode.type === NodeType.VIDEO_ANALYZER; const isImage = targetNode.type === NodeType.IMAGE_GENERATOR || targetNode.type === NodeType.IMAGE_EDITOR; if (isVideo || isImage) { return ( <button className="w-full text-left px-3 py-2 text-xs font-medium text-slate-600 hover:bg-purple-500/20 hover:text-purple-400 rounded-lg flex items-center gap-2 transition-colors" onClick={() => { replacementTargetRef.current = contextMenu.id ?? null; if (isVideo) replaceVideoInputRef.current?.click(); else replaceImageInputRef.current?.click(); setContextMenu(null); }}> <RefreshCw size={12} /> 替换素材 </button> ); } } return null; })()}
                           <button className="w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 rounded-lg flex items-center gap-2 transition-colors mt-1" onClick={() => { deleteNodes([contextMenuTarget.id]); setContextMenu(null); }}><Trash2 size={12} /> 删除节点</button>
                       </>
                   )}
@@ -1151,7 +1153,7 @@ export default function StudioTab() {
                   )}
                   {contextMenuTarget?.type === 'group' && (
                       <>
-                           <button className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2 transition-colors mb-1" onClick={() => { saveGroupAsWorkflow(contextMenu.id); setContextMenu(null); }}> <FolderHeart size={12} className="text-blue-600" /> 保存为工作流 </button>
+                           <button className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2 transition-colors mb-1" onClick={() => { if (contextMenu.id) saveGroupAsWorkflow(contextMenu.id); setContextMenu(null); }}> <FolderHeart size={12} className="text-blue-600" /> 保存为工作流 </button>
                            <button className="w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 rounded-lg flex items-center gap-2 transition-colors" onClick={() => { setGroups(p => p.filter(g => g.id !== contextMenu.id)); setContextMenu(null); }}> <Trash2 size={12} /> 删除分组 </button>
                       </>
                   )}

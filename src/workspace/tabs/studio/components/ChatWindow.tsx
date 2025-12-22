@@ -76,17 +76,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
             let assistantText = '';
             let receivedFiles: FileInfo[] = [];
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await capeService.parseSSE(stream, {
-                session: (data) => {
+                session: (_data: any) => {
                     // 会话已在 capeService 内部处理
                 },
-                cape_start: (data) => {
+                cape_start: (data: any) => {
                     setLoadingText(`执行 ${data.cape_name || '能力'}...`);
                 },
-                cape_match: (data) => {
+                cape_match: (data: any) => {
                     setLoadingText(`匹配到 ${data.cape_id || '能力'}`);
                 },
-                content: (data) => {
+                content: (data: any) => {
                     assistantText += data.text || '';
                     // 实时更新消息
                     setMessages(prev => {
@@ -100,7 +101,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                         return updated;
                     });
                 },
-                cape_end: (data) => {
+                cape_end: (data: any) => {
                     // 收集输出文件
                     if (data.output_files?.length) {
                         receivedFiles.push(...data.output_files);
@@ -124,7 +125,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ isOpen, onClose }) => {
                     }
                     setIsLoading(false);
                 },
-                error: (data) => {
+                error: (data: any) => {
                     setMessages(prev => [...prev, {
                         role: 'model',
                         text: `错误: ${data.message || '未知错误'}`

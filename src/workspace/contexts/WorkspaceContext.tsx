@@ -1,20 +1,41 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useMemo, ReactNode } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { DEFAULT_WORKSPACE_TAB, WORKSPACE_TABS, isValidTabId } from '@/workspace/config/tabs';
+import { DEFAULT_WORKSPACE_TAB, WORKSPACE_TABS, isValidTabId, Tab } from '@/workspace/config/tabs';
 
-const WorkspaceContext = createContext(null);
+interface Location {
+  tab: string;
+  [key: string]: string;
+}
 
-function searchParamsToObject(searchParams) {
-  const entries = {};
+interface NavigateOptions {
+  replace?: boolean;
+}
+
+interface WorkspaceContextValue {
+  tabs: Tab[];
+  activeTab: string;
+  location: Location;
+  switchTab: (tabId: string, options?: NavigateOptions) => void;
+  setLocation: (partial: Record<string, string | null | undefined>, options?: NavigateOptions) => void;
+}
+
+const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
+
+function searchParamsToObject(searchParams: URLSearchParams): Record<string, string> {
+  const entries: Record<string, string> = {};
   searchParams.forEach((value, key) => {
     entries[key] = value;
   });
   return entries;
 }
 
-export function WorkspaceProvider({ children }) {
+interface WorkspaceProviderProps {
+  children: ReactNode;
+}
+
+export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -24,7 +45,7 @@ export function WorkspaceProvider({ children }) {
   const activeTab = isValidTabId(requestedTab) ? requestedTab : DEFAULT_WORKSPACE_TAB;
 
   const navigateWithQuery = useCallback(
-    (changes, { replace = false } = {}) => {
+    (changes: Record<string, string | null | undefined>, { replace = false }: NavigateOptions = {}) => {
       const params = new URLSearchParams(searchParams.toString());
       Object.entries(changes).forEach(([key, value]) => {
         if (value === undefined || value === null || value === '') {
@@ -52,7 +73,7 @@ export function WorkspaceProvider({ children }) {
   );
 
   const switchTab = useCallback(
-    (tabId, options) => {
+    (tabId: string, options?: NavigateOptions) => {
       const nextTab = isValidTabId(tabId) ? tabId : DEFAULT_WORKSPACE_TAB;
       navigateWithQuery({ tab: nextTab === DEFAULT_WORKSPACE_TAB ? null : nextTab }, options);
     },
@@ -60,7 +81,7 @@ export function WorkspaceProvider({ children }) {
   );
 
   const setLocation = useCallback(
-    (partial, options) => {
+    (partial: Record<string, string | null | undefined>, options?: NavigateOptions) => {
       navigateWithQuery(partial, options);
     },
     [navigateWithQuery]
@@ -84,7 +105,7 @@ export function WorkspaceProvider({ children }) {
   );
 }
 
-export function useWorkspace() {
+export function useWorkspace(): WorkspaceContextValue {
   const ctx = useContext(WorkspaceContext);
   if (!ctx) {
     throw new Error('useWorkspace must be used within WorkspaceProvider');

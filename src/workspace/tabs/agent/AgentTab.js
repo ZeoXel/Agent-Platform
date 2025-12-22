@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { HiPaperClip, HiWrench, HiTrash } from 'react-icons/hi2';
 import { IoSend } from 'react-icons/io5';
-import styles from './AgentTab.module.css';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import { CapeConfigModal } from '@/components/cape';
 
@@ -15,14 +14,13 @@ export default function AgentPage() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const [isStreamingContent, setIsStreamingContent] = useState(false); // 是否正在流式输出内容
-    const [currentStatus, setCurrentStatus] = useState(''); // 当前状态：thinking, generating, editing, responding
+    const [isStreamingContent, setIsStreamingContent] = useState(false);
+    const [currentStatus, setCurrentStatus] = useState('');
     const [error, setError] = useState(null);
     const [attachments, setAttachments] = useState([]);
     const [showCapeConfig, setShowCapeConfig] = useState(false);
-    const [enabledCapes, setEnabledCapes] = useState(null); // null = all enabled
+    const [enabledCapes, setEnabledCapes] = useState(null);
 
-    // 使用会话管理hook
     const {
         sessions,
         activeSessionId,
@@ -35,34 +33,24 @@ export default function AgentPage() {
     } = useSessionManager();
     const hydratedSessionRef = useRef(null);
 
-    // 初始化：加载活跃会话或创建新会话
     useEffect(() => {
         if (isLoading) return;
-
         if (!activeSessionId) {
-            if (!sessions.length) {
-                createSession();
-            } else {
-                setMessages([]);
-            }
+            if (!sessions.length) createSession();
+            else setMessages([]);
             hydratedSessionRef.current = null;
             return;
         }
-
         if (!activeSession) return;
         if (hydratedSessionRef.current === activeSession.id) return;
-
         setMessages(activeSession.messages || []);
         setAttachments([]);
         hydratedSessionRef.current = activeSession.id;
     }, [isLoading, activeSessionId, activeSession, sessions.length, createSession]);
 
-    // 保存消息变化到localStorage
-    // 使用 ref 来跟踪上次保存的消息，避免重复保存
     const prevMessagesRef = useRef([]);
     useEffect(() => {
         if (activeSessionId && messages.length > 0 && !isTyping) {
-            // 只在消息实际变化时保存
             const messagesChanged = JSON.stringify(prevMessagesRef.current) !== JSON.stringify(messages);
             if (messagesChanged) {
                 updateSessionMessages(activeSessionId, messages);
@@ -71,34 +59,19 @@ export default function AgentPage() {
         }
     }, [messages, activeSessionId, isTyping, updateSessionMessages]);
 
-    // Auto-scroll to bottom
-    // 滚动策略：
-    // 1. 新消息添加时滚动（用户发送消息、AI回复开始）
-    // 2. 状态提示出现时滚动
-    // 3. 流式输出完成时滚动一次
-    // 4. 流式输出过程中不滚动
     const prevMessageCountRef = useRef(0);
     const prevIsStreamingRef = useRef(false);
-
     useEffect(() => {
         const messageCountChanged = messages.length !== prevMessageCountRef.current;
         const statusAppeared = isTyping && currentStatus;
         const streamJustFinished = prevIsStreamingRef.current && !isStreamingContent;
-
-        const shouldScroll = messageCountChanged || statusAppeared || streamJustFinished;
-
-        if (shouldScroll) {
-            // 使用 setTimeout 确保 DOM 已更新
-            setTimeout(() => {
-                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, 0);
+        if (messageCountChanged || statusAppeared || streamJustFinished) {
+            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
             prevMessageCountRef.current = messages.length;
         }
-
         prevIsStreamingRef.current = isStreamingContent;
     }, [messages.length, isTyping, currentStatus, isStreamingContent]);
 
-    // Auto-resize textarea
     useEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
@@ -109,73 +82,36 @@ export default function AgentPage() {
     const handleSelectAttachment = async (event) => {
         const files = Array.from(event.target.files || []);
         if (!files.length) return;
-
-        const readFile = (file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    resolve({
-                        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
-                        name: file.name,
-                        size: file.size,
-                        type: file.type,
-                        url: reader.result,
-                    });
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
+        const readFile = (file) => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve({
+                id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
+                name: file.name, size: file.size, type: file.type, url: reader.result,
             });
-        };
-
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
         try {
             const fileEntries = await Promise.all(files.map(readFile));
             setAttachments(prev => [...prev, ...fileEntries]);
-        } catch (err) {
-            console.error('读取素材失败', err);
-        } finally {
-            event.target.value = '';
-        }
+        } catch (err) { console.error('读取素材失败', err); }
+        event.target.value = '';
     };
 
-    const handleRemoveAttachment = (id) => {
-        setAttachments(prev => prev.filter(file => file.id !== id));
-    };
+    const handleRemoveAttachment = (id) => setAttachments(prev => prev.filter(f => f.id !== id));
 
     const formatMessageForApi = (message) => {
-        const formatted = {
-            role: message.role,
-            content: message.content
-        };
-
-        const hasAttachments = Array.isArray(message.attachments) && message.attachments.length > 0;
-        if (!hasAttachments) {
-            return formatted;
-        }
-
+        const formatted = { role: message.role, content: message.content };
+        if (!Array.isArray(message.attachments) || !message.attachments.length) return formatted;
         const parts = [];
         if (typeof message.content === 'string' && message.content.trim()) {
-            parts.push({
-                type: 'text',
-                text: message.content.trim()
-            });
+            parts.push({ type: 'text', text: message.content.trim() });
         }
-
         message.attachments.forEach((file) => {
-            if (file.url) {
-                parts.push({
-                    type: 'image_url',
-                    image_url: { url: file.url }
-                });
-            }
+            if (file.url) parts.push({ type: 'image_url', image_url: { url: file.url } });
         });
-
         formatted.content = parts;
-        formatted.attachments = message.attachments.map(({ url, name, type }) => ({
-            url,
-            name,
-            type
-        }));
-
+        formatted.attachments = message.attachments.map(({ url, name, type }) => ({ url, name, type }));
         return formatted;
     };
 
@@ -184,290 +120,187 @@ export default function AgentPage() {
         if (!trimmedInput && attachments.length === 0) return;
         if (!activeSessionId) return;
 
-        const userImagePreviews = attachments.map(file => ({
-            url: file.url,
-            name: file.name,
-            isLocal: true
-        }));
-
         const userMsg = {
-            role: 'user',
-            content: trimmedInput,
-            timestamp: Date.now(),
-            attachments,
-            images: userImagePreviews
+            role: 'user', content: trimmedInput, timestamp: Date.now(), attachments,
+            images: attachments.map(f => ({ url: f.url, name: f.name, isLocal: true }))
         };
         const updatedMessages = [...messages, userMsg];
         setMessages(updatedMessages);
-        setInput('');
-        setAttachments([]);
-        setIsTyping(true);
-        setCurrentStatus('thinking');
-        setError(null);
+        setInput(''); setAttachments([]); setIsTyping(true); setCurrentStatus('thinking'); setError(null);
 
         try {
             const response = await fetch('/api/agent-v2', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: activeSessionId,
-                        messages: updatedMessages.map(formatMessageForApi)
-                })
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: activeSessionId, messages: updatedMessages.map(formatMessageForApi) })
             });
-
-            if (!response.ok) {
-                throw new Error('请求失败');
-            }
+            if (!response.ok) throw new Error('请求失败');
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-
-            let assistantContent = '';
-            let assistantImages = [];
-            let buffer = '';
-            let hasHiddenStatus = false; // 追踪是否已隐藏状态
+            let assistantContent = '', assistantImages = [], buffer = '', hasHiddenStatus = false;
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || '';
 
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
                         try {
-                            const parsed = JSON.parse(data);
-
-                            if (parsed.type === 'status') {
-                                setCurrentStatus(parsed.status);
-                            } else if (parsed.type === 'content') {
+                            const parsed = JSON.parse(line.slice(6));
+                            if (parsed.type === 'status') setCurrentStatus(parsed.status);
+                            else if (parsed.type === 'content') {
                                 assistantContent += parsed.content;
-                                // 收到第一个内容时，隐藏状态提示并标记开始流式输出
                                 if (!hasHiddenStatus) {
                                     hasHiddenStatus = true;
-                                    setIsTyping(false);
-                                    setCurrentStatus('');
-                                    setIsStreamingContent(true);
+                                    setIsTyping(false); setCurrentStatus(''); setIsStreamingContent(true);
                                 }
-                                // 实时更新消息
                                 setMessages(prev => {
-                                    const newMessages = [...prev];
-                                    const lastMsg = newMessages[newMessages.length - 1];
-                                    if (lastMsg && lastMsg.role === 'assistant') {
-                                        // 创建新对象而不是修改原对象
-                                        newMessages[newMessages.length - 1] = {
-                                            ...lastMsg,
-                                            content: assistantContent,
-                                            isStreaming: true
-                                        };
+                                    const newMsgs = [...prev];
+                                    const last = newMsgs[newMsgs.length - 1];
+                                    if (last?.role === 'assistant') {
+                                        newMsgs[newMsgs.length - 1] = { ...last, content: assistantContent, isStreaming: true };
                                     } else {
-                                        newMessages.push({
-                                            role: 'assistant',
-                                            content: assistantContent,
-                                            images: assistantImages,
-                                            isStreaming: true
-                                        });
+                                        newMsgs.push({ role: 'assistant', content: assistantContent, images: assistantImages, isStreaming: true });
                                     }
-                                    return newMessages;
+                                    return newMsgs;
                                 });
                             } else if (parsed.type === 'images') {
                                 assistantImages = parsed.images;
                                 setMessages(prev => {
-                                    const newMessages = [...prev];
-                                    const lastMsg = newMessages[newMessages.length - 1];
-                                    if (lastMsg && lastMsg.role === 'assistant') {
-                                        // 创建新对象而不是修改原对象
-                                        newMessages[newMessages.length - 1] = {
-                                            ...lastMsg,
-                                            images: assistantImages
-                                        };
-                                    } else {
-                                        newMessages.push({
-                                            role: 'assistant',
-                                            content: assistantContent,
-                                            images: assistantImages
-                                        });
-                                    }
-                                    return newMessages;
+                                    const newMsgs = [...prev];
+                                    const last = newMsgs[newMsgs.length - 1];
+                                    if (last?.role === 'assistant') newMsgs[newMsgs.length - 1] = { ...last, images: assistantImages };
+                                    else newMsgs.push({ role: 'assistant', content: assistantContent, images: assistantImages });
+                                    return newMsgs;
                                 });
                             } else if (parsed.type === 'done') {
-                                // 完成，标记流式结束并更新消息
                                 setMessages(prev => {
-                                    const newMessages = [...prev];
-                                    const lastMsg = newMessages[newMessages.length - 1];
-                                    if (lastMsg && lastMsg.role === 'assistant') {
-                                        newMessages[newMessages.length - 1] = {
-                                            ...lastMsg,
-                                            isStreaming: false
-                                        };
-                                    }
-                                    return newMessages;
+                                    const newMsgs = [...prev];
+                                    const last = newMsgs[newMsgs.length - 1];
+                                    if (last?.role === 'assistant') newMsgs[newMsgs.length - 1] = { ...last, isStreaming: false };
+                                    return newMsgs;
                                 });
-                                // 使用 setTimeout 确保在下一个事件循环中更新状态
-                                // 这样可以确保 prevIsStreamingRef 已经是 true
-                                setTimeout(() => {
-                                    setIsStreamingContent(false);
-                                }, 0);
+                                setTimeout(() => setIsStreamingContent(false), 0);
                                 break;
-                            } else if (parsed.type === 'error') {
-                                throw new Error(parsed.error);
-                            }
-                        } catch (e) {
-                            console.error('解析SSE数据失败:', e);
-                        }
+                            } else if (parsed.type === 'error') throw new Error(parsed.error);
+                        } catch (e) { console.error('解析SSE数据失败:', e); }
                     }
                 }
             }
-
-            // 如果没有添加助手消息，添加一个
             setMessages(prev => {
-                const lastMsg = prev[prev.length - 1];
-                if (!lastMsg || lastMsg.role !== 'assistant') {
-                    return [...prev, {
-                        role: 'assistant',
-                        content: assistantContent,
-                        images: assistantImages
-                    }];
-                }
+                const last = prev[prev.length - 1];
+                if (!last || last.role !== 'assistant') return [...prev, { role: 'assistant', content: assistantContent, images: assistantImages }];
                 return prev;
             });
-
         } catch (err) {
             setError(err.message || '发生未知错误');
-            const errorMsg = {
-                role: 'assistant',
-                content: `抱歉，发生了错误：${err.message}`,
-                images: []
-            };
-            setMessages(prev => [...prev, errorMsg]);
+            setMessages(prev => [...prev, { role: 'assistant', content: `抱歉，发生了错误：${err.message}`, images: [] }]);
         } finally {
-            setIsTyping(false);
-            setCurrentStatus('');
-            setIsStreamingContent(false);
+            setIsTyping(false); setCurrentStatus(''); setIsStreamingContent(false);
         }
     };
 
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
-        }
-    };
-
-    const handleNewChat = () => {
-        setMessages([]);
-        setError(null);
-        setAttachments([]);
-        createSession();
-    };
-
+    const handleKeyDown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } };
+    const handleNewChat = () => { setMessages([]); setError(null); setAttachments([]); createSession(); };
     const handleSwitchSession = (sessionId) => {
         switchSession(sessionId);
         const session = sessions.find(s => s.id === sessionId);
-        if (session) {
-            setMessages(session.messages);
-        }
-        setAttachments([]);
-        setError(null);
+        if (session) setMessages(session.messages);
+        setAttachments([]); setError(null);
     };
-
     const handleDeleteSession = (sessionId, e) => {
         e.stopPropagation();
         if (confirm('确定要删除这个会话吗？')) {
             removeSession(sessionId);
-            // 如果删除的是当前会话，清空消息
-            if (sessionId === activeSessionId) {
-                setMessages([]);
-                setAttachments([]);
-            }
+            if (sessionId === activeSessionId) { setMessages([]); setAttachments([]); }
+        }
+    };
+    const handleCapeConfigSave = useCallback((newEnabledCapes) => setEnabledCapes(newEnabledCapes), []);
+
+    const getStatusText = () => {
+        switch (currentStatus) {
+            case 'thinking': return '思考中';
+            case 'generating': return '生成中';
+            case 'editing': return '编辑中';
+            default: return '处理中';
         }
     };
 
-    // Cape 配置保存
-    const handleCapeConfigSave = useCallback((newEnabledCapes) => {
-        setEnabledCapes(newEnabledCapes);
-    }, []);
-
     return (
-        <div className={styles.container}>
-            {/* Left Sidebar: History */}
-            <div className={styles.sidebar}>
-                <div className={styles.sidebarHeader}>
-                    <span>历史记录</span>
-                    <button className={styles.newChatBtn} onClick={handleNewChat}>+</button>
+        <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+            {/* Sidebar */}
+            <aside className="w-[280px] flex-shrink-0 flex flex-col h-full
+                backdrop-blur-2xl bg-gradient-to-b from-white/35 to-white/15
+                border-r border-white/25">
+                <div className="p-4 flex justify-between items-center">
+                    <span className="text-sm font-semibold text-gray-600">历史记录</span>
+                    <button onClick={handleNewChat}
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-semibold
+                            backdrop-blur-xl bg-gradient-to-br from-white/30 to-white/10
+                            border border-white/30 hover:from-blue-500/25 hover:to-blue-500/10
+                            transition-all hover:-rotate-6">
+                        +
+                    </button>
                 </div>
-                <div className={styles.historyList}>
+                <div className="flex-1 overflow-y-auto px-2 space-y-1">
                     {isLoading ? (
-                        <div className={styles.loadingText}>加载中...</div>
+                        <p className="text-center text-sm text-gray-500 py-4">加载中...</p>
                     ) : sessions.length === 0 ? (
-                        <div className={styles.emptyText}>暂无历史记录</div>
+                        <p className="text-center text-sm text-gray-500 py-4">暂无历史记录</p>
                     ) : (
                         sessions.map(session => (
-                            <div
-                                key={session.id}
-                                className={`${styles.historyItem} ${session.id === activeSessionId ? styles.active : ''}`}
+                            <div key={session.id}
                                 onClick={() => handleSwitchSession(session.id)}
-                            >
-                                <span className={styles.historyTitle}>{session.title}</span>
-                                <button
-                                    className={styles.deleteBtn}
-                                    onClick={(e) => handleDeleteSession(session.id, e)}
-                                    title="删除会话"
-                                >
+                                className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-all
+                                    ${session.id === activeSessionId
+                                        ? 'bg-gradient-to-br from-blue-500/15 to-blue-500/5 text-blue-600 font-medium'
+                                        : 'hover:bg-gradient-to-br hover:from-white/30 hover:to-white/10'}`}>
+                                <span className="truncate text-sm">{session.title}</span>
+                                <button onClick={(e) => handleDeleteSession(session.id, e)}
+                                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 hover:text-red-500 transition-all">
                                     <HiTrash size={14} />
                                 </button>
                             </div>
                         ))
                     )}
                 </div>
-            </div>
+            </aside>
 
-            {/* Center: Chat Area */}
-            <div className={styles.chatArea}>
-                <div className={styles.chatScrollArea}>
+            {/* Chat Area */}
+            <main className="flex-1 flex flex-col relative overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-8 pb-32 space-y-6">
                     {messages.length === 0 ? (
-                        <div className={styles.welcomeMessage}>
-                            <div className={styles.cosmicRing}>
-                                <div className={styles.ring}></div>
-                                <div className={styles.ring}></div>
-                                <div className={styles.ring}></div>
-                            </div>
-                            <h1 className={styles.welcomeTitle}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src="/logo.svg" alt="Agent Platform Logo" className={styles.welcomeLogo} />
+                        <div className="h-full flex flex-col items-center justify-center text-center">
+                            <h1 className="text-2xl font-semibold flex items-center gap-3">
+                                <img src="/logo.svg" alt="Logo" className="w-12 h-12 drop-shadow-lg" />
                                 你好！我能帮你做点什么？
                             </h1>
-                            <p className={styles.welcomeSubtitle}></p>
                         </div>
                     ) : (
                         messages.map((msg, idx) => (
-                            <div key={idx} className={`${styles.messageRow} ${msg.role === 'user' ? styles.userRow : ''}`}>
-                                <div className={`${styles.messageContent} ${msg.isStreaming ? styles.streaming : ''}`}>
+                            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[70%] px-4 py-3 rounded-xl
+                                    backdrop-blur-xl shadow-lg
+                                    ${msg.role === 'user'
+                                        ? 'bg-gradient-to-br from-blue-500/20 to-blue-500/5 border border-white/25 rounded-tr-sm'
+                                        : 'bg-gradient-to-br from-white/40 to-white/15 border border-white/30 rounded-tl-sm'}
+                                    ${msg.isStreaming ? 'animate-pulse' : ''}`}>
                                     {msg.role === 'assistant' ? (
-                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                        <div className="prose prose-sm max-w-none">
+                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                        </div>
                                     ) : (
-                                        msg.content
+                                        <p>{msg.content}</p>
                                     )}
-                                    {/* Render images if present */}
-                                    {msg.images && msg.images.length > 0 && (
-                                        <div className={styles.imageGrid}>
-                                            {msg.images.map((img, imgIdx) => (
-                                                <a
-                                                    key={imgIdx}
-                                                    href={img.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className={styles.imageLink}
-                                                >
-                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img
-                                                        src={img.url}
-                                                        alt={`生成的图片 ${imgIdx + 1}`}
-                                                        className={styles.generatedImage}
-                                                    />
+                                    {msg.images?.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-3">
+                                            {msg.images.map((img, i) => (
+                                                <a key={i} href={img.url} target="_blank" rel="noopener noreferrer"
+                                                    className="block rounded-lg overflow-hidden hover:scale-105 transition-transform">
+                                                    <img src={img.url} alt="" className="max-h-80 rounded-lg" />
                                                 </a>
                                             ))}
                                         </div>
@@ -477,106 +310,75 @@ export default function AgentPage() {
                         ))
                     )}
                     {isTyping && (
-                        <div className={styles.messageRow}>
-                            <div className={styles.loadingBubble}>
-                                <span className={styles.statusText}>
-                                    {currentStatus === 'thinking' && '思考中'}
-                                    {currentStatus === 'generating' && '生成中'}
-                                    {currentStatus === 'editing' && '编辑中'}
-                                    {!currentStatus && '处理中'}
-                                    <span className={styles.shimmer}>...</span>
-                                </span>
+                        <div className="flex justify-start">
+                            <div className="px-4 py-2 rounded-full
+                                backdrop-blur-xl bg-gradient-to-br from-white/35 to-white/15
+                                border border-white/25 shadow-lg">
+                                <span className="text-sm text-gray-600 animate-pulse">{getStatusText()}...</span>
                             </div>
                         </div>
                     )}
                     <div ref={chatEndRef} />
                 </div>
 
-                {/* Input Area */}
-                <div className={styles.inputContainer}>
-                    <div className={styles.inputWrapper}>
+                {/* Input */}
+                <div className="absolute bottom-0 left-0 right-0 p-6 flex justify-center pointer-events-none">
+                    <div className="w-full max-w-3xl pointer-events-auto
+                        backdrop-blur-2xl bg-gradient-to-br from-white/40 to-white/20
+                        border border-white/30 rounded-2xl p-3 shadow-xl
+                        transition-all hover:shadow-2xl focus-within:shadow-2xl
+                        focus-within:from-white/50 focus-within:to-white/30">
                         {attachments.length > 0 && (
-                            <div className={styles.attachmentsPreview}>
+                            <div className="flex flex-wrap gap-2 mb-2">
                                 {attachments.map(file => (
-                                    <div key={file.id} className={styles.attachmentChip}>
+                                    <div key={file.id} className="flex items-center gap-2 px-2 py-1 rounded-lg bg-white/50 border border-dashed border-gray-300">
                                         {file.type?.startsWith('image/') && (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={file.url} alt={file.name} className={styles.attachmentThumb} />
+                                            <img src={file.url} alt="" className="w-9 h-9 rounded object-cover" />
                                         )}
-                                        <div className={styles.attachmentInfo}>
-                                            <span className={styles.attachmentName}>{file.name}</span>
-                                            <span className={styles.attachmentSize}>{(file.size / 1024).toFixed(1)} KB</span>
+                                        <div className="text-xs">
+                                            <p className="font-medium truncate max-w-[100px]">{file.name}</p>
+                                            <p className="text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            className={styles.attachmentRemove}
-                                            onClick={() => handleRemoveAttachment(file.id)}
-                                            title="移除素材"
-                                        >
+                                        <button onClick={() => handleRemoveAttachment(file.id)}
+                                            className="p-1 rounded hover:bg-gray-200 text-gray-500">
                                             <HiTrash size={14} />
                                         </button>
                                     </div>
                                 ))}
                             </div>
                         )}
-                        <textarea
-                            ref={textareaRef}
-                            className={styles.chatInput}
-                            placeholder="输入消息... 例如：画一只可爱的小猫"
-                            value={input}
+                        <textarea ref={textareaRef} value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
+                            placeholder="输入消息... 例如：画一只可爱的小猫"
                             rows={1}
+                            className="w-full bg-transparent border-none outline-none resize-none text-base px-2 py-1"
                         />
-                        <div className={styles.inputActions}>
-                            <div className={styles.leftActions}>
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    multiple
-                                    accept="image/*"
-                                    className={styles.fileInput}
-                                    onChange={handleSelectAttachment}
-                                />
-                                {/* Asset Upload Button */}
-                                <button
-                                    type="button"
-                                    className={styles.actionButton}
-                                    title="上传素材"
-                                    onClick={() => fileInputRef.current?.click()}
-                                >
+                        <div className="flex justify-between items-center px-2 mt-2">
+                            <div className="flex gap-2">
+                                <input ref={fileInputRef} type="file" multiple accept="image/*"
+                                    onChange={handleSelectAttachment} className="hidden" />
+                                <button onClick={() => fileInputRef.current?.click()}
+                                    className="p-2 rounded-lg text-gray-500 hover:bg-white/50 hover:text-gray-700 transition-all">
                                     <HiPaperClip size={18} />
                                 </button>
-                                <button
-                                    className={styles.actionButton}
-                                    title="能力配置"
-                                    onClick={() => setShowCapeConfig(true)}
-                                >
+                                <button onClick={() => setShowCapeConfig(true)}
+                                    className="p-2 rounded-lg text-gray-500 hover:bg-white/50 hover:text-gray-700 transition-all">
                                     <HiWrench size={18} />
-                                    {enabledCapes && enabledCapes.size > 0 && (
-                                        <span className={styles.capeBadge}>{enabledCapes.size}</span>
-                                    )}
                                 </button>
                             </div>
-                            <button
-                                className={styles.sendButton}
-                                onClick={handleSendMessage}
-                                disabled={( !input.trim() && attachments.length === 0) || isTyping}
-                            >
+                            <button onClick={handleSendMessage}
+                                disabled={(!input.trim() && !attachments.length) || isTyping}
+                                className="p-2 rounded-lg text-blue-500 hover:bg-blue-500/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
                                 <IoSend size={18} />
                             </button>
                         </div>
                     </div>
                 </div>
-            </div>
+            </main>
 
-            {/* Cape 配置弹窗 */}
-            <CapeConfigModal
-                isOpen={showCapeConfig}
-                onClose={() => setShowCapeConfig(false)}
-                enabledCapes={enabledCapes}
-                onSave={handleCapeConfigSave}
-            />
+            <CapeConfigModal isOpen={showCapeConfig} onClose={() => setShowCapeConfig(false)}
+                enabledCapes={enabledCapes} onSave={handleCapeConfigSave} />
         </div>
     );
 }
