@@ -104,7 +104,7 @@ export const CapeCard = forwardRef<HTMLDivElement, CapeCardProps>(({
             {cape.intent_patterns.slice(0, 3).map((pattern) => (
               <span key={pattern} className={`text-xs px-2 py-0.5 rounded-full
                 bg-white/50 ${disabled ? 'text-gray-400' : 'text-gray-600'}`}>
-                "{pattern}"
+                &quot;{pattern}&quot;
               </span>
             ))}
             {cape.intent_patterns.length > 3 && (

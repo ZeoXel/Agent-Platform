@@ -163,11 +163,14 @@ const InputThumbnails = ({ assets, onReorder }: { assets: InputAsset[], onReorde
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [dragOffset, setDragOffset] = useState(0);
     const onReorderRef = useRef(onReorder);
-    onReorderRef.current = onReorder; 
+    onReorderRef.current = onReorder;
     const stateRef = useRef({ draggingId: null as string | null, startX: 0, originalAssets: [] as InputAsset[] });
-    const THUMB_WIDTH = 48; 
+    const THUMB_WIDTH = 48;
     const GAP = 6;
     const ITEM_FULL_WIDTH = THUMB_WIDTH + GAP;
+
+    // Use refs to store handlers for cleanup
+    const handlersRef = useRef<{ move: ((e: MouseEvent) => void) | null; up: ((e: MouseEvent) => void) | null }>({ move: null, up: null });
 
     const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
         if (!stateRef.current.draggingId) return;
@@ -193,17 +196,22 @@ const InputThumbnails = ({ assets, onReorder }: { assets: InputAsset[], onReorde
         setDragOffset(0);
         stateRef.current.draggingId = null;
         document.body.style.cursor = '';
-        window.removeEventListener('mousemove', handleGlobalMouseMove);
-        window.removeEventListener('mouseup', handleGlobalMouseUp);
-    }, [ITEM_FULL_WIDTH]); 
-    
+        if (handlersRef.current.move) window.removeEventListener('mousemove', handlersRef.current.move);
+        if (handlersRef.current.up) window.removeEventListener('mouseup', handlersRef.current.up);
+    }, [ITEM_FULL_WIDTH]);
+
+    // Update refs when handlers change
+    useEffect(() => {
+        handlersRef.current = { move: handleGlobalMouseMove, up: handleGlobalMouseUp };
+    }, [handleGlobalMouseMove, handleGlobalMouseUp]);
+
     useEffect(() => {
         return () => {
             document.body.style.cursor = '';
-            window.removeEventListener('mousemove', handleGlobalMouseMove);
-            window.removeEventListener('mouseup', handleGlobalMouseUp);
+            if (handlersRef.current.move) window.removeEventListener('mousemove', handlersRef.current.move);
+            if (handlersRef.current.up) window.removeEventListener('mouseup', handlersRef.current.up);
         }
-    }, [handleGlobalMouseMove, handleGlobalMouseUp]);
+    }, []);
 
     const handleMouseDown = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();

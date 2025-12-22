@@ -1,7 +1,7 @@
 "use client";
 
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { 
     X, Brush, Eraser, Palette, Undo, Trash2, 
     MousePointer2, Download, Play, Image as ImageIcon, 
@@ -44,18 +44,28 @@ export const SketchEditor: React.FC<SketchEditorProps> = ({ onClose, onGenerate 
     const [isGenerating, setIsGenerating] = useState(false);
     const [showPalette, setShowPalette] = useState(false);
 
+    // Define saveHistory before using it in useEffect
+    const saveHistory = useCallback(() => {
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        if (canvas && ctx) {
+            const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            setCanvasHistory(prev => [...prev.slice(-10), data]);
+        }
+    }, []);
+
     // Init Canvas
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        
+
         // Handle High DPI
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
-        
+
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
-        
+
         const ctx = canvas.getContext('2d');
         if (ctx) {
             ctx.scale(dpr, dpr);
@@ -65,16 +75,7 @@ export const SketchEditor: React.FC<SketchEditorProps> = ({ onClose, onGenerate 
             ctx.lineJoin = 'round';
             saveHistory(); // Save initial blank state
         }
-    }, []);
-
-    const saveHistory = () => {
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext('2d');
-        if (canvas && ctx) {
-            const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            setCanvasHistory(prev => [...prev.slice(-10), data]);
-        }
-    };
+    }, [saveHistory]);
 
     const handleUndo = () => {
         if (canvasHistory.length <= 1) return;

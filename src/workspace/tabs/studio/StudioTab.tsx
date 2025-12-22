@@ -192,11 +192,19 @@ export default function StudioTab() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [draggingNodeParentGroupId, setDraggingNodeParentGroupId] = useState<string | null>(null);
-  const [draggingGroup, setDraggingGroup] = useState<any>(null); 
+  const [draggingGroup, setDraggingGroup] = useState<any>(null);
   const [resizingGroupId, setResizingGroupId] = useState<string | null>(null);
   const [activeGroupNodeIds, setActiveGroupNodeIds] = useState<string[]>([]);
-  const [connectionStart, setConnectionStart] = useState<{ id: string, x: number, y: number } | null>(null);
+  // Connection start stores both the node id and the actual screen position of the port
+  const [connectionStart, setConnectionStart] = useState<{
+    id: string,
+    portType: 'input' | 'output',
+    // Screen coordinates of the port center (for converting to canvas coords)
+    screenX: number,
+    screenY: number
+  } | null>(null);
   const [selectionRect, setSelectionRect] = useState<any>(null);
+  const [isSpacePressed, setIsSpacePressed] = useState(false); // Track space key for canvas drag
   
   // Node Resizing
   const [resizingNodeId, setResizingNodeId] = useState<string | null>(null);
@@ -499,10 +507,19 @@ export default function StudioTab() {
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
       if (contextMenu) setContextMenu(null); setSelectedGroupId(null);
-      if (e.button === 0 && !e.shiftKey) { 
+
+      // Space + Left Click = Canvas Drag (like middle mouse or shift+click)
+      if (e.button === 0 && isSpacePressed) {
+          e.preventDefault();
+          setIsDraggingCanvas(true);
+          setLastMousePos({ x: e.clientX, y: e.clientY });
+          return;
+      }
+
+      if (e.button === 0 && !e.shiftKey) {
           if (e.detail > 1) { e.preventDefault(); return; }
-          setSelectedNodeIds([]); 
-          setSelectionRect({ startX: e.clientX, startY: e.clientY, currentX: e.clientX, currentY: e.clientY }); 
+          setSelectedNodeIds([]);
+          setSelectionRect({ startX: e.clientX, startY: e.clientY, currentX: e.clientX, currentY: e.clientY });
       }
       if (e.button === 1 || (e.button === 0 && e.shiftKey)) { setIsDraggingCanvas(true); setLastMousePos({ x: e.clientX, y: e.clientY }); }
   };
@@ -512,10 +529,15 @@ export default function StudioTab() {
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
           rafRef.current = null;
+          // Always update mousePos for connection preview
           setMousePos({ x: clientX, y: clientY });
-          
-          if (selectionRect) { setSelectionRect((prev:any) => prev ? ({ ...prev, currentX: clientX, currentY: clientY }) : null); return; }
-          
+
+          if (selectionRect) {
+              setSelectionRect((prev:any) => prev ? ({ ...prev, currentX: clientX, currentY: clientY }) : null);
+              // Don't return - allow mousePos update for connection preview
+              if (!connectionStartRef.current) return;
+          }
+
           if (dragGroupRef.current) {
               const { id, startX, startY, mouseStartX, mouseStartY, childNodes } = dragGroupRef.current;
               const dx = (clientX - mouseStartX) / scale;
@@ -880,8 +902,19 @@ export default function StudioTab() {
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'v') { if (clipboard) { e.preventDefault(); saveHistory(); const newNode: AppNode = { ...clipboard, id: `n-${Date.now()}-${Math.floor(Math.random()*1000)}`, x: clipboard.x + 50, y: clipboard.y + 50, status: NodeStatus.IDLE, inputs: [] }; setNodes(prev => [...prev, newNode]); setSelectedNodeIds([newNode.id]); } return; }
         if (e.key === 'Delete' || e.key === 'Backspace') { if (selectedGroupId) { saveHistory(); setGroups(prev => prev.filter(g => g.id !== selectedGroupId)); setSelectedGroupId(null); return; } if (selectedNodeIds.length > 0) { deleteNodes(selectedNodeIds); } }
     };
-    const handleKeyDownSpace = (e: KeyboardEvent) => { if (e.code === 'Space' && (e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') { document.body.classList.add('cursor-grab-override'); } };
-    const handleKeyUpSpace = (e: KeyboardEvent) => { if (e.code === 'Space') { document.body.classList.remove('cursor-grab-override'); } };
+    const handleKeyDownSpace = (e: KeyboardEvent) => {
+        if (e.code === 'Space' && (e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+            e.preventDefault(); // Prevent page scroll
+            document.body.classList.add('cursor-grab-override');
+            setIsSpacePressed(true);
+        }
+    };
+    const handleKeyUpSpace = (e: KeyboardEvent) => {
+        if (e.code === 'Space') {
+            document.body.classList.remove('cursor-grab-override');
+            setIsSpacePressed(false);
+        }
+    };
     window.addEventListener('keydown', handleKeyDown); window.addEventListener('keydown', handleKeyDownSpace); window.addEventListener('keyup', handleKeyUpSpace);
     return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keydown', handleKeyDownSpace); window.removeEventListener('keyup', handleKeyUpSpace); };
   }, [selectedWorkflowId, selectedNodeIds, selectedGroupId, deleteNodes, undo, saveHistory, clipboard]);
@@ -1065,22 +1098,20 @@ export default function StudioTab() {
                       </linearGradient>
                   </defs>
                   {connectionStart && (() => {
-                      let startX = 0, startY = 0;
-                      if (connectionStart.id === 'smart-sequence-dock') {
-                          startX = (connectionStart.x - pan.x) / scale; startY = (connectionStart.y - pan.y) / scale;
-                      } else {
-                          const startNode = nodes.find(n => n.id === connectionStart.id); if (!startNode) return null;
-                          const startHeight = startNode.height || getApproxNodeHeight(startNode); startX = startNode.x + (startNode.width || 420) + 3; startY = startNode.y + startHeight / 2;
-                      }
-                      const endX = (mousePos.x - pan.x) / scale; const endY = (mousePos.y - pan.y) / scale;
+                      // Convert screen coordinates to canvas coordinates
+                      // Screen to canvas: canvasPos = (screenPos - pan) / scale
+                      const startX = (connectionStart.screenX - pan.x) / scale;
+                      const startY = (connectionStart.screenY - pan.y) / scale;
+                      const endX = (mousePos.x - pan.x) / scale;
+                      const endY = (mousePos.y - pan.y) / scale;
                       return (
-                          <path 
-                              d={`M ${startX} ${startY} L ${endX} ${endY}`} 
-                              stroke="url(#previewGradient)" 
-                              strokeWidth="3" 
-                              fill="none" 
-                              className="connection-preview-line" 
-                              strokeLinecap="round" 
+                          <path
+                              d={`M ${startX} ${startY} L ${endX} ${endY}`}
+                              stroke="url(#previewGradient)"
+                              strokeWidth="3"
+                              fill="none"
+                              className="connection-preview-line"
+                              strokeLinecap="round"
                           />
                       );
                   })()}
@@ -1102,14 +1133,37 @@ export default function StudioTab() {
                           setDraggingNodeParentGroupId(pGroup?.id || null); setDraggingNodeId(id); 
                       }
                   }}
-                  onPortMouseDown={(e, id, type) => { e.stopPropagation(); setConnectionStart({ id, x: e.clientX, y: e.clientY }); }}
-                  onPortMouseUp={(e, id, type) => { 
-                      e.stopPropagation(); 
-                      const start = connectionStartRef.current; 
+                  onPortMouseDown={(e, id, type) => {
+                      e.stopPropagation();
+                      // Get the actual center position of the port element
+                      const portElement = e.currentTarget as HTMLElement;
+                      const rect = portElement.getBoundingClientRect();
+                      const centerX = rect.left + rect.width / 2;
+                      const centerY = rect.top + rect.height / 2;
+                      setConnectionStart({ id, portType: type, screenX: centerX, screenY: centerY });
+                  }}
+                  onPortMouseUp={(e, id, type) => {
+                      e.stopPropagation();
+                      const start = connectionStartRef.current;
                       if (start && start.id !== id) {
-                          if (start.id === 'smart-sequence-dock') { } else { setConnections(p => [...p, { from: start.id, to: id }]); setNodes(p => p.map(n => n.id === id ? { ...n, inputs: [...n.inputs, start.id] } : n)); }
-                      } 
-                      setConnectionStart(null); 
+                          if (start.id === 'smart-sequence-dock') {
+                              // Smart sequence dock connection - do nothing for now
+                          } else {
+                              // Determine connection direction based on port types
+                              // output -> input: from = start, to = target (normal)
+                              // input -> output: from = target, to = start (reversed)
+                              let fromId = start.id;
+                              let toId = id;
+                              if (start.portType === 'input' && type === 'output') {
+                                  // Reverse: target output -> start input
+                                  fromId = id;
+                                  toId = start.id;
+                              }
+                              setConnections(p => [...p, { from: fromId, to: toId }]);
+                              setNodes(p => p.map(n => n.id === toId ? { ...n, inputs: [...n.inputs, fromId] } : n));
+                          }
+                      }
+                      setConnectionStart(null);
                   }}
                   onNodeContextMenu={(e, id) => { e.stopPropagation(); e.preventDefault(); setContextMenu({ visible: true, x: e.clientX, y: e.clientY, id }); setContextMenuTarget({ type: 'node', id }); }}
                   onResizeMouseDown={(e, id, w, h) => { 
@@ -1170,7 +1224,13 @@ export default function StudioTab() {
              isOpen={isMultiFrameOpen} 
              onClose={() => setIsMultiFrameOpen(false)} 
              onGenerate={handleMultiFrameGenerate}
-             onConnectStart={(e, type) => { e.preventDefault(); e.stopPropagation(); setConnectionStart({ id: 'smart-sequence-dock', x: e.clientX, y: e.clientY }); }}
+             onConnectStart={(e, type) => {
+                 e.preventDefault();
+                 e.stopPropagation();
+                 const portElement = e.currentTarget as HTMLElement;
+                 const rect = portElement.getBoundingClientRect();
+                 setConnectionStart({ id: 'smart-sequence-dock', portType: 'output', screenX: rect.left + rect.width / 2, screenY: rect.top + rect.height / 2 });
+             }}
           />
           <SonicStudio 
             isOpen={isSonicStudioOpen}
