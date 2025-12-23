@@ -228,6 +228,7 @@ export default function StudioTab() {
   const historyIndexRef = useRef(historyIndex);
   const connectionStartRef = useRef(connectionStart);
   const rafRef = useRef<number | null>(null); // For RAF Throttling
+  const canvasContainerRef = useRef<HTMLDivElement>(null); // Canvas container ref for coordinate offset
   
   // Replacement Input Refs
   const replaceVideoInputRef = useRef<HTMLInputElement>(null);
@@ -266,6 +267,13 @@ export default function StudioTab() {
       childNodes: {id: string, startX: number, startY: number}[]
   } | null>(null);
 
+  // Helper to get mouse position relative to canvas container (accounting for Navbar offset)
+  const getCanvasMousePos = useCallback((clientX: number, clientY: number) => {
+      if (!canvasContainerRef.current) return { x: clientX, y: clientY };
+      const rect = canvasContainerRef.current.getBoundingClientRect();
+      return { x: clientX - rect.left, y: clientY - rect.top };
+  }, []);
+
   useEffect(() => {
       nodesRef.current = nodes; connectionsRef.current = connections; groupsRef.current = groups;
       historyRef.current = history; historyIndexRef.current = historyIndex; connectionStartRef.current = connectionStart;
@@ -280,7 +288,14 @@ export default function StudioTab() {
             const sAssets = await loadFromStorage<any[]>('assets'); if (sAssets) setAssetHistory(sAssets);
             const sWfs = await loadFromStorage<Workflow[]>('workflows'); if (sWfs) setWorkflows(sWfs);
             const sNodes = await loadFromStorage<AppNode[]>('nodes'); if (sNodes) setNodes(sNodes);
-            const sConns = await loadFromStorage<Connection[]>('connections'); if (sConns) setConnections(sConns);
+            const sConns = await loadFromStorage<Connection[]>('connections');
+            if (sConns) {
+              // Deduplicate connections on load
+              const uniqueConns = sConns.filter((conn, idx, arr) =>
+                arr.findIndex(c => c.from === conn.from && c.to === conn.to) === idx
+              );
+              setConnections(uniqueConns);
+            }
             const sGroups = await loadFromStorage<Group[]>('groups'); if (sGroups) setGroups(sGroups);
           } catch (e) {
             console.error("Failed to load storage", e);
@@ -519,7 +534,9 @@ export default function StudioTab() {
       if (e.button === 0 && !e.shiftKey) {
           if (e.detail > 1) { e.preventDefault(); return; }
           setSelectedNodeIds([]);
-          setSelectionRect({ startX: e.clientX, startY: e.clientY, currentX: e.clientX, currentY: e.clientY });
+          // Use canvas-relative coordinates for selection rect
+          const canvasPos = getCanvasMousePos(e.clientX, e.clientY);
+          setSelectionRect({ startX: canvasPos.x, startY: canvasPos.y, currentX: canvasPos.x, currentY: canvasPos.y });
       }
       if (e.button === 1 || (e.button === 0 && e.shiftKey)) { setIsDraggingCanvas(true); setLastMousePos({ x: e.clientX, y: e.clientY }); }
   };
@@ -529,11 +546,18 @@ export default function StudioTab() {
       if (rafRef.current) return;
       rafRef.current = requestAnimationFrame(() => {
           rafRef.current = null;
-          // Always update mousePos for connection preview
-          setMousePos({ x: clientX, y: clientY });
+          // Get canvas-relative coordinates (accounting for Navbar offset)
+          let canvasX = clientX, canvasY = clientY;
+          if (canvasContainerRef.current) {
+              const rect = canvasContainerRef.current.getBoundingClientRect();
+              canvasX = clientX - rect.left;
+              canvasY = clientY - rect.top;
+          }
+          // Always update mousePos for connection preview (using canvas-relative coords)
+          setMousePos({ x: canvasX, y: canvasY });
 
           if (selectionRect) {
-              setSelectionRect((prev:any) => prev ? ({ ...prev, currentX: clientX, currentY: clientY }) : null);
+              setSelectionRect((prev:any) => prev ? ({ ...prev, currentX: canvasX, currentY: canvasY }) : null);
               // Don't return - allow mousePos update for connection preview
               if (!connectionStartRef.current) return;
           }
@@ -885,7 +909,18 @@ export default function StudioTab() {
   const loadWorkflow = (id: string | null) => {
       if (!id) return;
       const wf = workflows.find(w => w.id === id);
-      if (wf) { saveHistory(); setNodes(JSON.parse(JSON.stringify(wf.nodes))); setConnections(JSON.parse(JSON.stringify(wf.connections))); setGroups(JSON.parse(JSON.stringify(wf.groups))); setSelectedWorkflowId(id); }
+      if (wf) {
+        saveHistory();
+        setNodes(JSON.parse(JSON.stringify(wf.nodes)));
+        // Deduplicate connections when loading workflow
+        const conns = JSON.parse(JSON.stringify(wf.connections)) as Connection[];
+        const uniqueConns = conns.filter((conn, idx, arr) =>
+          arr.findIndex(c => c.from === conn.from && c.to === conn.to) === idx
+        );
+        setConnections(uniqueConns);
+        setGroups(JSON.parse(JSON.stringify(wf.groups)));
+        setSelectedWorkflowId(id);
+      }
   };
 
   const deleteWorkflow = (id: string) => { setWorkflows(prev => prev.filter(w => w.id !== id)); if (selectedWorkflowId === id) setSelectedWorkflowId(null); };
@@ -1003,8 +1038,9 @@ export default function StudioTab() {
   return (
     <div className="w-screen h-screen overflow-hidden bg-slate-50">
       <div
+          ref={canvasContainerRef}
           className={`w-full h-full overflow-hidden text-slate-700 selection:bg-blue-200 ${isDraggingCanvas ? 'cursor-grabbing' : 'cursor-default'}`}
-          onMouseDown={handleCanvasMouseDown} onWheel={handleWheel} 
+          onMouseDown={handleCanvasMouseDown} onWheel={handleWheel}
           onDoubleClick={(e) => { e.preventDefault(); if (e.detail > 1 && !selectionRect) { setContextMenu({ visible: true, x: e.clientX, y: e.clientY, id: '' }); setContextMenuTarget({ type: 'create' }); } }}
           onContextMenu={(e) => { e.preventDefault(); if(e.target === e.currentTarget) setContextMenu(null); }}
           onDragOver={handleCanvasDragOver} onDrop={handleCanvasDrop}
@@ -1098,10 +1134,27 @@ export default function StudioTab() {
                       </linearGradient>
                   </defs>
                   {connectionStart && (() => {
-                      // Convert screen coordinates to canvas coordinates
-                      // Screen to canvas: canvasPos = (screenPos - pan) / scale
-                      const startX = (connectionStart.screenX - pan.x) / scale;
-                      const startY = (connectionStart.screenY - pan.y) / scale;
+                      // Calculate start position based on node position (like original Vite version)
+                      let startX = 0, startY = 0;
+                      if (connectionStart.id === 'smart-sequence-dock') {
+                          // For smart sequence dock, use screen coordinates
+                          startX = (connectionStart.screenX - pan.x) / scale;
+                          startY = (connectionStart.screenY - pan.y) / scale;
+                      } else {
+                          // For regular nodes, calculate from node position
+                          const startNode = nodes.find(n => n.id === connectionStart.id);
+                          if (!startNode) return null;
+                          const startHeight = startNode.height || getApproxNodeHeight(startNode);
+                          // Output port is on the right side of the node
+                          if (connectionStart.portType === 'output') {
+                              startX = startNode.x + (startNode.width || 420) + 3;
+                              startY = startNode.y + startHeight / 2;
+                          } else {
+                              // Input port is on the left side
+                              startX = startNode.x - 3;
+                              startY = startNode.y + startHeight / 2;
+                          }
+                      }
                       const endX = (mousePos.x - pan.x) / scale;
                       const endY = (mousePos.y - pan.y) / scale;
                       return (
@@ -1159,8 +1212,18 @@ export default function StudioTab() {
                                   fromId = id;
                                   toId = start.id;
                               }
-                              setConnections(p => [...p, { from: fromId, to: toId }]);
-                              setNodes(p => p.map(n => n.id === toId ? { ...n, inputs: [...n.inputs, fromId] } : n));
+                              // Prevent duplicate connections
+                              setConnections(p => {
+                                  const exists = p.some(c => c.from === fromId && c.to === toId);
+                                  if (exists) return p;
+                                  return [...p, { from: fromId, to: toId }];
+                              });
+                              setNodes(p => p.map(n => {
+                                  if (n.id !== toId) return n;
+                                  // Prevent duplicate inputs
+                                  if (n.inputs.includes(fromId)) return n;
+                                  return { ...n, inputs: [...n.inputs, fromId] };
+                              }));
                           }
                       }
                       setConnectionStart(null);

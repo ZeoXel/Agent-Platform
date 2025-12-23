@@ -4,14 +4,25 @@ import { SmartSequenceItem, VideoGenerationMode } from "../types";
 
 // --- Initialization ---
 
+// SSR guard
+const isBrowser = typeof window !== 'undefined';
+
 const getClient = () => {
-  if (!process.env.API_KEY) {
-    throw new Error("API Key is missing. Please select a paid API key via the Google AI Studio button.");
+  // Try multiple environment variable names for flexibility
+  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+                 process.env.NEXT_PUBLIC_API_KEY ||
+                 process.env.GEMINI_API_KEY ||
+                 process.env.API_KEY ||
+                 (isBrowser ? localStorage.getItem('gemini_api_key') : null);
+
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please set NEXT_PUBLIC_GEMINI_API_KEY in .env.local or configure via settings.");
   }
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return new GoogleGenAI({ apiKey });
 };
 
 const getPolloKey = () => {
+    if (!isBrowser) return null;
     return localStorage.getItem('pollo_api_key');
 };
 
