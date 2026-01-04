@@ -336,8 +336,8 @@ export default function StudioTab() {
   const getNodeNameCN = (t: string) => {
       switch(t) {
           case NodeType.PROMPT_INPUT: return '创意描述';
-          case NodeType.IMAGE_GENERATOR: return '文字生图';
-          case NodeType.VIDEO_GENERATOR: return '文生视频';
+          case NodeType.IMAGE_GENERATOR: return '图片生成';
+          case NodeType.VIDEO_GENERATOR: return '视频生成';
           case NodeType.AUDIO_GENERATOR: return '灵感音乐';
           case NodeType.VIDEO_ANALYZER: return '视频分析';
           case NodeType.IMAGE_EDITOR: return '图像编辑';
@@ -436,8 +436,8 @@ export default function StudioTab() {
       
       const typeMap: Record<string, string> = {
           [NodeType.PROMPT_INPUT]: '创意描述',
-          [NodeType.IMAGE_GENERATOR]: '文字生图',
-          [NodeType.VIDEO_GENERATOR]: '文生视频',
+          [NodeType.IMAGE_GENERATOR]: '图片生成',
+          [NodeType.VIDEO_GENERATOR]: '视频生成',
           [NodeType.AUDIO_GENERATOR]: '灵感音乐',
           [NodeType.VIDEO_ANALYZER]: '视频分析',
           [NodeType.IMAGE_EDITOR]: '图像编辑'
@@ -486,13 +486,14 @@ export default function StudioTab() {
       const complexPrompt = compileMultiFramePrompt(frames as any[]);
 
       try {
+          // 使用 veo3.1-components 支持多图参考
           const res = await generateVideo(
-              complexPrompt, 
-              'veo-3.1-generate-preview', 
+              complexPrompt,
+              'veo3.1-components',
               { aspectRatio: '16:9', count: 1 },
-              frames[0].src, 
+              frames[0].src,
               null,
-              frames.length > 1 ? frames.map(f => f.src) : undefined 
+              frames.length > 1 ? frames.map(f => f.src) : undefined
           );
           
           if (res.isFallbackImage) {
@@ -507,18 +508,28 @@ export default function StudioTab() {
   };
 
 
-  const handleWheel = (e: React.WheelEvent) => {
+  const handleWheel = useCallback((e: WheelEvent) => {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
+        const rect = canvasContainerRef.current?.getBoundingClientRect();
+        if (!rect) return;
         const newScale = Math.min(Math.max(0.2, scale - e.deltaY * 0.001), 3);
-        const rect = e.currentTarget.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+        const x = e.clientX - rect.left; const y = e.clientY - rect.top;
         const scaleDiff = newScale - scale;
         setPan(p => ({ x: p.x - (x - p.x) * (scaleDiff / scale), y: p.y - (y - p.y) * (scaleDiff / scale) }));
         setScale(newScale);
-      } else { 
+      } else {
         setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
       }
-  };
+  }, [scale]);
+
+  // 使用原生事件监听器以支持 preventDefault（非 passive 模式）
+  useEffect(() => {
+      const el = canvasContainerRef.current;
+      if (!el) return;
+      el.addEventListener('wheel', handleWheel, { passive: false });
+      return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
       if (contextMenu) setContextMenu(null); setSelectedGroupId(null);
@@ -769,7 +780,12 @@ export default function StudioTab() {
 
           if (node.type === NodeType.IMAGE_GENERATOR) {
                const inputImages: string[] = [];
+               // 收集上游连接节点的图片
                inputs.forEach(n => { if (n?.data.image) inputImages.push(n.data.image); });
+               // 如果节点自身有图片（用户上传的参考图或之前的生成结果），也作为参考
+               if (node.data.image && !inputImages.includes(node.data.image)) {
+                   inputImages.unshift(node.data.image); // 优先放在最前面
+               }
 
                const isStoryboard = /分镜|storyboard|sequence|shots|frames|json/i.test(prompt);
 
@@ -1032,7 +1048,21 @@ export default function StudioTab() {
       const style = document.createElement('style');
       style.innerHTML = ` .cursor-grab-override, .cursor-grab-override * { cursor: grab !important; } .cursor-grab-override:active, .cursor-grab-override:active * { cursor: grabbing !important; } `;
       document.head.appendChild(style);
-      return () => { document.head.removeChild(style); };
+
+      // Disable global scrollbars for Studio canvas
+      const htmlEl = document.documentElement;
+      const bodyEl = document.body;
+      const originalHtmlOverflow = htmlEl.style.overflow;
+      const originalBodyOverflow = bodyEl.style.overflow;
+      htmlEl.style.overflow = 'hidden';
+      bodyEl.style.overflow = 'hidden';
+
+      return () => {
+          document.head.removeChild(style);
+          // Restore original overflow on unmount
+          htmlEl.style.overflow = originalHtmlOverflow;
+          bodyEl.style.overflow = originalBodyOverflow;
+      };
   }, []);
 
   return (
@@ -1040,7 +1070,7 @@ export default function StudioTab() {
       <div
           ref={canvasContainerRef}
           className={`w-full h-full overflow-hidden text-slate-700 selection:bg-blue-200 ${isDraggingCanvas ? 'cursor-grabbing' : 'cursor-default'}`}
-          onMouseDown={handleCanvasMouseDown} onWheel={handleWheel}
+          onMouseDown={handleCanvasMouseDown}
           onDoubleClick={(e) => { e.preventDefault(); if (e.detail > 1 && !selectionRect) { setContextMenu({ visible: true, x: e.clientX, y: e.clientY, id: '' }); setContextMenuTarget({ type: 'create' }); } }}
           onContextMenu={(e) => { e.preventDefault(); if(e.target === e.currentTarget) setContextMenu(null); }}
           onDragOver={handleCanvasDragOver} onDrop={handleCanvasDrop}
@@ -1071,12 +1101,12 @@ export default function StudioTab() {
                 <div className={`flex items-center gap-1.5 p-1.5 rounded-[18px] bg-white/90 border border-slate-200 backdrop-blur-xl shadow-2xl ${nodes.length > 0 ? 'pointer-events-none' : 'pointer-events-auto'}`}>
                     <button onClick={() => addNode(NodeType.IMAGE_GENERATOR)} className="flex items-center gap-2.5 px-5 py-3 rounded-[14px] bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-all border border-slate-200 hover:border-slate-300 group shadow-sm hover:shadow-md hover:-translate-y-0.5 duration-300">
                         <ImageIcon size={16} className="text-slate-400 transition-colors group-hover:text-blue-600" />
-                        <span className="text-[13px] font-medium tracking-wide">文字生图</span>
+                        <span className="text-[13px] font-medium tracking-wide">图片生成</span>
                     </button>
-                    
+
                      <button onClick={() => addNode(NodeType.VIDEO_GENERATOR)} className="flex items-center gap-2.5 px-5 py-3 rounded-[14px] bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-all border border-slate-200 hover:border-slate-300 group shadow-sm hover:shadow-md hover:-translate-y-0.5 duration-300">
                         <Film size={16} className="text-slate-400 transition-colors group-hover:text-purple-400" />
-                        <span className="text-[13px] font-medium tracking-wide">文生视频</span>
+                        <span className="text-[13px] font-medium tracking-wide">视频生成</span>
                     </button>
 
                     <button onClick={() => addNode(NodeType.VIDEO_GENERATOR, undefined, undefined, { generationMode: 'FIRST_LAST_FRAME' })} className="flex items-center gap-2.5 px-5 py-3 rounded-[14px] bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-all border border-slate-200 hover:border-slate-300 group shadow-sm hover:shadow-md hover:-translate-y-0.5 duration-300">

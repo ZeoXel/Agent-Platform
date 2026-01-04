@@ -2,15 +2,8 @@ const DB_NAME = 'ls-studio_db';
 const DB_VERSION = 1;
 const STORE_NAME = 'app_data';
 
-// SSR guard - check if we're in browser environment
-const isBrowser = typeof window !== 'undefined';
-
 const getDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
-    if (!isBrowser) {
-      reject(new Error('IndexedDB is not available in SSR'));
-      return;
-    }
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = (event: any) => {
@@ -31,7 +24,6 @@ const getDB = (): Promise<IDBDatabase> => {
 };
 
 export const saveToStorage = async (key: string, data: any) => {
-  if (!isBrowser) return; // Skip in SSR
   const db = await getDB();
   return new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -44,7 +36,6 @@ export const saveToStorage = async (key: string, data: any) => {
 };
 
 export const loadFromStorage = async <T>(key: string): Promise<T | undefined> => {
-  if (!isBrowser) return undefined; // Skip in SSR
   const db = await getDB();
   return new Promise<T | undefined>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');

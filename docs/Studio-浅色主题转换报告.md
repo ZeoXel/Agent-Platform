@@ -1,7 +1,7 @@
 # Studio 浅色主题转换完成报告
 
 ## 任务总结
-✅ 成功将 SUNSTUDIO 从**黑色风格**转换为**白色风格**，完美匹配 Agent Platform 的蓝白极简设计系统。
+✅ 成功将 ls-studio 从**黑色风格**转换为**白色风格**，完美匹配 Agent Platform 的蓝白极简设计系统。
 
 ---
 

@@ -1,5 +1,3 @@
-"use client";
-
 
 import React, { useState, useEffect } from 'react';
 import { X, Save, Key, ExternalLink } from 'lucide-react';
@@ -28,28 +26,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-white/90 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200" onClick={onClose}>
       <div
-        className="w-[480px] bg-white border border-slate-300 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className="w-[480px] bg-[#1c1c1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-900 transition-colors">
+        <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
             <X size={18} />
           </button>
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-slate-700/50 rounded-lg">
-              <Key size={16} className="text-slate-900" />
+              <Key size={16} className="text-white" />
             </div>
-            <span className="text-sm font-bold text-slate-900">设置 (Settings)</span>
+            <span className="text-sm font-bold text-white">设置 (Settings)</span>
           </div>
         </div>
 
         <div className="p-6 space-y-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Pollo.ai API Key (Wan 2.5)</label>
-              <a href="https://pollo.ai/dashboard/api-keys" target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 transition-colors">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pollo.ai API Key (Wan 2.5)</label>
+              <a href="https://pollo.ai/dashboard/api-keys" target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors">
                 <span>获取 Key</span>
                 <ExternalLink size={10} />
               </a>
@@ -62,7 +60,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               <input
                 type="password"
                 autoComplete="off"
-                className="w-full bg-slate-900/30 border border-slate-300 rounded-xl py-3 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-colors font-mono"
+                className="w-full bg-black/30 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 transition-colors font-mono"
                 placeholder="粘贴您的 Pollo API Key..."
                 value={polloKey}
                 onChange={(e) => setPolloKey(e.target.value)}
@@ -74,10 +72,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </div>
         </div>
 
-        <div className="p-4 border-t border-slate-200 bg-[#121214] flex justify-end">
+        <div className="p-4 border-t border-white/5 bg-[#121214] flex justify-end">
           <button
             onClick={handleSave}
-            className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${isSaved ? 'bg-green-500 text-slate-900' : 'bg-white text-black hover:bg-cyan-400'}`}
+            className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${isSaved ? 'bg-green-500 text-white' : 'bg-white text-black hover:bg-cyan-400'}`}
           >
             {isSaved ? '已保存' : '保存设置'}
           </button>

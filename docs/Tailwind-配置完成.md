@@ -1,7 +1,7 @@
 # Tailwind CSS 配置完成报告
 
 ## 问题诊断
-**根本原因**: 项目完全没有安装 Tailwind CSS，而 SUNSTUDIO 组件大量使用 Tailwind 类名，导致所有样式失效。
+**根本原因**: 项目完全没有安装 Tailwind CSS，而 ls-studio 组件大量使用 Tailwind 类名，导致所有样式失效。
 
 ## 已完成修复
 
@@ -106,7 +106,7 @@ GET /workspace?tab=studio 200 in 1779ms ✅
 
 ## Tailwind 样式示例
 
-SUNSTUDIO 使用的关键 Tailwind 类：
+ls-studio 使用的关键 Tailwind 类：
 
 ```jsx
 // 背景和颜色

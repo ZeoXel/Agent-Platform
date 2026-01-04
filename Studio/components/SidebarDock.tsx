@@ -1,4 +1,3 @@
-"use client";
 
 import React, { useState, useRef, useEffect } from 'react';
 import { 
@@ -44,8 +43,8 @@ interface SidebarDockProps {
 const getNodeNameCN = (t: string) => {
     switch(t) {
         case NodeType.PROMPT_INPUT: return '创意描述';
-        case NodeType.IMAGE_GENERATOR: return '图片生成';
-        case NodeType.VIDEO_GENERATOR: return '视频生成';
+        case NodeType.IMAGE_GENERATOR: return '文字生图';
+        case NodeType.VIDEO_GENERATOR: return '文生视频';
         case NodeType.AUDIO_GENERATOR: return '灵感音乐';
         case NodeType.VIDEO_ANALYZER: return '视频分析';
         case NodeType.IMAGE_EDITOR: return '图像编辑';
@@ -133,22 +132,22 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
 
             return (
                 <>
-                    <div className="p-4 border-b border-slate-200 flex flex-col gap-3 bg-slate-50">
+                    <div className="p-4 border-b border-white/5 flex flex-col gap-3 bg-white/5">
                         <div className="flex justify-between items-center">
-                            <button onClick={() => setActivePanel(null)}><X size={14} className="text-slate-500 hover:text-slate-900" /></button>
+                            <button onClick={() => setActivePanel(null)}><X size={14} className="text-slate-500 hover:text-white" /></button>
                             <span className="text-xs font-bold uppercase tracking-widest text-white/50">历史记录</span>
                         </div>
                         {/* Tabs */}
-                        <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <div className="flex bg-black/20 p-1 rounded-lg">
                             <button 
                                 onClick={() => setActiveHistoryTab('image')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-[10px] font-bold rounded-md transition-all ${activeHistoryTab === 'image' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-600'}`}
+                                className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-[10px] font-bold rounded-md transition-all ${activeHistoryTab === 'image' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
                             >
                                 <ImageIcon size={12} /> 图片
                             </button>
                             <button 
                                 onClick={() => setActiveHistoryTab('video')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-[10px] font-bold rounded-md transition-all ${activeHistoryTab === 'video' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-600'}`}
+                                className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-[10px] font-bold rounded-md transition-all ${activeHistoryTab === 'video' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
                             >
                                 <VideoIcon size={12} /> 视频
                             </button>
@@ -165,7 +164,7 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
                                 {filteredAssets.map(a => (
                                     <div 
                                         key={a.id} 
-                                        className="aspect-square rounded-xl overflow-hidden cursor-grab active:cursor-grabbing border border-slate-200 hover:border-blue-500/50 transition-colors group relative shadow-md bg-slate-100"
+                                        className="aspect-square rounded-xl overflow-hidden cursor-grab active:cursor-grabbing border border-white/5 hover:border-cyan-500/50 transition-colors group relative shadow-md bg-black/20"
                                         draggable={true}
                                         onDragStart={(e) => {
                                             e.dataTransfer.setData('application/json', JSON.stringify(a));
@@ -183,10 +182,10 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
                                         ) : (
                                             <video src={a.src} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" draggable={false} />
                                         )}
-                                        <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-white/90 backdrop-blur-md text-[8px] font-bold text-slate-700">
+                                        <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[8px] font-bold text-white/70">
                                             {a.type.includes('image') ? 'IMG' : 'MOV'}
                                         </div>
-                                        <div className="absolute bottom-0 left-0 w-full p-1.5 bg-gradient-to-t from-white/90 to-transparent text-[9px] text-slate-900 truncate font-medium">
+                                        <div className="absolute bottom-0 left-0 w-full p-1.5 bg-gradient-to-t from-black/80 to-transparent text-[9px] text-white/90 truncate font-medium">
                                             {a.title || 'Untitled'}
                                         </div>
                                     </div>
@@ -201,11 +200,11 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
         if (activePanel === 'workflow') {
             return (
                 <>
-                    <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                    <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
                         <span className="text-xs font-bold uppercase tracking-widest text-white/50">
                             我的工作流
                         </span>
-                        <button onClick={onSaveWorkflow} className="p-1.5 bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-slate-900 rounded-md transition-colors" title="保存当前工作流">
+                        <button onClick={onSaveWorkflow} className="p-1.5 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500 hover:text-white rounded-md transition-colors" title="保存当前工作流">
                             <Save size={14} />
                         </button>
                     </div>
@@ -220,8 +219,8 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
                                 <div 
                                     key={wf.id} 
                                     className={`
-                                        relative p-2 rounded-xl border bg-slate-100 group transition-all duration-300 cursor-grab active:cursor-grabbing hover:bg-slate-50
-                                        ${selectedWorkflowId === wf.id ? 'border-blue-500/50 ring-1 ring-cyan-500/20' : 'border-slate-200 hover:border-slate-400'}
+                                        relative p-2 rounded-xl border bg-black/20 group transition-all duration-300 cursor-grab active:cursor-grabbing hover:bg-white/5
+                                        ${selectedWorkflowId === wf.id ? 'border-cyan-500/50 ring-1 ring-cyan-500/20' : 'border-white/5 hover:border-white/20'}
                                     `}
                                     draggable={true}
                                     onDragStart={(e) => {
@@ -236,7 +235,7 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
                                         setContextMenu({visible: true, x: e.clientX, y: e.clientY, id: wf.id, type: 'workflow'}); 
                                     }}
                                 >
-                                    <div className="aspect-[2/1] bg-white/70 rounded-lg mb-2 overflow-hidden relative">
+                                    <div className="aspect-[2/1] bg-black/40 rounded-lg mb-2 overflow-hidden relative">
                                         {wf.thumbnail ? (
                                             <img src={wf.thumbnail} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" draggable={false} />
                                         ) : (
@@ -248,14 +247,14 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
                                     <div className="flex items-center justify-between px-1">
                                         {editingWorkflowId === wf.id ? (
                                             <input 
-                                                className="bg-white/80 border border-blue-500/50 rounded px-1 text-xs text-slate-900 w-full outline-none"
+                                                className="bg-black/50 border border-cyan-500/50 rounded px-1 text-xs text-white w-full outline-none"
                                                 defaultValue={wf.title}
                                                 autoFocus
                                                 onBlur={(e) => { onRenameWorkflow(wf.id, e.target.value); setEditingWorkflowId(null); }}
                                                 onKeyDown={(e) => { if(e.key === 'Enter') { onRenameWorkflow(wf.id, e.currentTarget.value); setEditingWorkflowId(null); } }}
                                             />
                                         ) : (
-                                            <span className="text-xs font-medium text-slate-600 truncate select-none group-hover:text-slate-900 transition-colors">{wf.title}</span>
+                                            <span className="text-xs font-medium text-slate-300 truncate select-none group-hover:text-white transition-colors">{wf.title}</span>
                                         )}
                                         <span className="text-[9px] text-slate-600 font-mono">{wf.nodes.length} 节点</span>
                                     </div>
@@ -270,8 +269,8 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
         // Default: Add Node
         return (
             <>
-                <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                    <button onClick={() => setActivePanel(null)}><X size={14} className="text-slate-500 hover:text-slate-900" /></button>
+                <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+                    <button onClick={() => setActivePanel(null)}><X size={14} className="text-slate-500 hover:text-white" /></button>
                     <span className="text-xs font-bold uppercase tracking-widest text-white/50">
                         添加节点
                     </span>
@@ -283,9 +282,9 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
                             <button 
                                 key={t} 
                                 onClick={(e) => { e.stopPropagation(); onAddNode(t); setActivePanel(null); }} 
-                                className="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center gap-3 text-sm text-slate-700 transition-colors border border-transparent hover:border-slate-200 hover:shadow-lg"
+                                className="w-full text-left p-3 rounded-xl bg-white/5 hover:bg-white/10 flex items-center gap-3 text-sm text-slate-200 transition-colors border border-transparent hover:border-white/5 hover:shadow-lg"
                             >
-                                <div className="p-2 bg-slate-100 rounded-lg text-blue-200 shadow-inner">
+                                <div className="p-2 bg-white/10 rounded-lg text-cyan-200 shadow-inner">
                                     <ItemIcon size={16} />
                                 </div> 
                                 <div className="flex flex-col">
@@ -303,7 +302,7 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
         <>
             {/* Left Vertical Dock */}
             <div 
-                className="fixed left-6 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 p-2 bg-[#ffffff]/70 backdrop-blur-2xl border border-slate-300 rounded-2xl shadow-2xl z-50 animate-in slide-in-from-left-10 duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                className="fixed left-6 top-1/2 -translate-y-1/2 flex flex-col items-center gap-3 p-2 bg-[#2c2c2e]/70 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl z-50 animate-in slide-in-from-left-10 duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
                 onMouseLeave={handleSidebarLeave}
             >
                 {[
@@ -319,13 +318,13 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
                         <button 
                             onMouseEnter={() => handleSidebarHover(item.id)}
                             onClick={() => item.action ? item.action() : setActivePanel(item.id as any)}
-                            className={`relative group w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${activePanel === item.id || item.active ? 'bg-white text-black shadow-lg' : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'}`}
+                            className={`relative group w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${activePanel === item.id || item.active ? 'bg-white text-black shadow-lg' : 'hover:bg-white/10 text-slate-300 hover:text-white'}`}
                         >
                             <item.icon size={20} strokeWidth={2} />
                         </button>
                         {/* Tooltip for Sidebar Icons */}
                         {(item.id === 'smart_sequence' || item.id === 'sonic_studio') && (
-                            <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2 py-1 bg-white/90 backdrop-blur-md rounded border border-slate-300 text-[10px] text-slate-900 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                            <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2 py-1 bg-black/80 backdrop-blur-md rounded border border-white/10 text-[10px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                                 {item.tooltip || (item.id === 'smart_sequence' ? '智能多帧' : '音频中心')}
                             </div>
                         )}
@@ -333,11 +332,11 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
                 ))}
                 
                 {/* Spacer & Settings */}
-                <div className="w-8 h-px bg-slate-100 my-1"></div>
+                <div className="w-8 h-px bg-white/10 my-1"></div>
                 
                 <button 
                     onClick={onOpenSettings}
-                    className="relative group w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 hover:bg-slate-100 text-slate-600 hover:text-slate-900"
+                    className="relative group w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 hover:bg-white/10 text-slate-300 hover:text-white"
                 >
                     <Settings size={20} strokeWidth={2} />
                 </button>
@@ -346,7 +345,7 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
 
             {/* Slide-out Panels */}
             <div 
-                className={`fixed left-24 top-1/2 -translate-y-1/2 max-h-[75vh] h-auto w-72 bg-white/85 backdrop-blur-3xl border border-slate-300 rounded-2xl shadow-2xl transition-all duration-500 ease-[${SPRING}] z-40 flex flex-col overflow-hidden ${activePanel ? 'translate-x-0 opacity-100' : '-translate-x-10 opacity-0 pointer-events-none scale-95'}`}
+                className={`fixed left-24 top-1/2 -translate-y-1/2 max-h-[75vh] h-auto w-72 bg-[#1c1c1e]/85 backdrop-blur-3xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-500 ease-[${SPRING}] z-40 flex flex-col overflow-hidden ${activePanel ? 'translate-x-0 opacity-100' : '-translate-x-10 opacity-0 pointer-events-none scale-95'}`}
                 onMouseEnter={handlePanelEnter}
                 onMouseLeave={handlePanelLeave}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -358,7 +357,7 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
             {/* Global Context Menu (Rendered outside the transformed panel to fix positioning) */}
             {contextMenu && (
                 <div 
-                    className="fixed z-[100] bg-[#ffffff] border border-slate-300 rounded-lg shadow-2xl p-1 animate-in fade-in zoom-in-95 duration-200 min-w-[120px]"
+                    className="fixed z-[100] bg-[#2c2c2e] border border-white/10 rounded-lg shadow-2xl p-1 animate-in fade-in zoom-in-95 duration-200 min-w-[120px]"
                     style={{ top: contextMenu.y, left: contextMenu.x }}
                     onMouseDown={e => e.stopPropagation()}
                     onMouseLeave={() => setContextMenu(null)}
@@ -370,7 +369,7 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
                     )}
                     {contextMenu.type === 'workflow' && (
                         <>
-                            <button className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 rounded-md flex items-center gap-2" onClick={() => { setEditingWorkflowId(contextMenu.id); setContextMenu(null); }}>
+                            <button className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-white/10 rounded-md flex items-center gap-2" onClick={() => { setEditingWorkflowId(contextMenu.id); setContextMenu(null); }}>
                                 <Edit size={12} /> 重命名
                             </button>
                             <button className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/20 rounded-md flex items-center gap-2" onClick={() => { onDeleteWorkflow(contextMenu.id); setContextMenu(null); }}>

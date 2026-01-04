@@ -2,52 +2,16 @@
 import { GoogleGenAI, GenerateContentResponse, Type, Modality, Part, FunctionDeclaration } from "@google/genai";
 import { SmartSequenceItem, VideoGenerationMode } from "../types";
 
-// --- External Model Provider Detection ---
-
-/**
- * 判断是否为外部API模型
- */
-const isExternalModel = (model: string): boolean => {
-    // Veo 外部API模型 (通过统一API调用)
-    if (model.startsWith('veo') && !model.includes('generate-preview')) return true;
-    // Seedream 模型
-    if (model.includes('seedream') || model.includes('doubao')) return true;
-    // Nano-banana 模型
-    if (model.includes('nano-banana')) return true;
-    return false;
-};
-
-/**
- * 判断模型类型
- */
-const getExternalModelType = (model: string): 'veo' | 'seedream' | 'nano-banana' | 'gemini' => {
-    if (model.startsWith('veo') && !model.includes('generate-preview')) return 'veo';
-    if (model.includes('seedream') || model.includes('doubao')) return 'seedream';
-    if (model.includes('nano-banana')) return 'nano-banana';
-    return 'gemini';
-};
-
 // --- Initialization ---
 
-// SSR guard
-const isBrowser = typeof window !== 'undefined';
-
 const getClient = () => {
-    // Try multiple environment variable names for flexibility
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
-        process.env.NEXT_PUBLIC_API_KEY ||
-        process.env.GEMINI_API_KEY ||
-        process.env.API_KEY ||
-        (isBrowser ? localStorage.getItem('gemini_api_key') : null);
-
-    if (!apiKey) {
-        throw new Error("API Key is missing. Please set NEXT_PUBLIC_GEMINI_API_KEY in .env.local or configure via settings.");
+    if (!process.env.API_KEY) {
+        throw new Error("API Key is missing. Please select a paid API key via the Google AI Studio button.");
     }
-    return new GoogleGenAI({ apiKey });
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 const getPolloKey = () => {
-    if (!isBrowser) return null;
     return localStorage.getItem('pollo_api_key');
 };
 
@@ -381,46 +345,8 @@ export const generateImageFromText = async (
     inputImages: string[] = [],
     options: { aspectRatio?: string, resolution?: string, count?: number } = {}
 ): Promise<string[]> => {
-    const count = options.count || 1;
-
-    // --- 外部模型路由 (Seedream / Nano-banana) ---
-    if (isExternalModel(model)) {
-        const modelType = getExternalModelType(model);
-
-        if (modelType === 'seedream' || modelType === 'nano-banana') {
-            try {
-                const response = await fetch('/api/studio/image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        prompt,
-                        model,
-                        images: inputImages,
-                        aspectRatio: options.aspectRatio,
-                        n: count,
-                        size: options.resolution,
-                    }),
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || `API错误: ${response.status}`);
-                }
-
-                const result = await response.json();
-                if (result.images && result.images.length > 0) {
-                    return result.images;
-                }
-                throw new Error('未返回图像');
-            } catch (e: any) {
-                console.error(`[${modelType}] Image Gen Error:`, e);
-                throw new Error(getErrorMessage(e));
-            }
-        }
-    }
-
-    // --- Gemini 原生模型 ---
     const ai = getClient();
+    const count = options.count || 1;
 
     // Fallback/Correction for model names
     const effectiveModel = model.includes('imagen') ? 'imagen-3.0-generate-002' : 'gemini-2.5-flash-image';
@@ -459,7 +385,7 @@ export const generateImageFromText = async (
 
         // Handle count (Gemini often generates 1, looping if needed or if API supports count)
         // Since Gemini Flash Image usually returns 1, we might need to call multiple times if count > 1
-        // But for simplicity/speed, we return what we got.
+        // But for simplicity/speed, we return what we got. 
 
         if (images.length === 0) {
             throw new Error("No images generated. Safety filter might have been triggered.");
@@ -480,57 +406,6 @@ export const generateVideo = async (
     videoInput?: any,
     referenceImages?: string[]
 ): Promise<{ uri: string, isFallbackImage?: boolean, videoMetadata?: any, uris?: string[] }> => {
-    // --- 外部Veo API路由 ---
-    if (isExternalModel(model) && getExternalModelType(model) === 'veo') {
-        try {
-            // 准备图片参数
-            const images: string[] = [];
-            if (inputImageBase64) images.push(inputImageBase64);
-            if (referenceImages) images.push(...referenceImages);
-
-            const response = await fetch('/api/studio/video', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt,
-                    model,
-                    aspectRatio: options.aspectRatio || '16:9',
-                    enhancePrompt: false, // 已在prompt中添加质量后缀
-                    enableUpsample: options.resolution === '1080p',
-                    images: images.length > 0 ? images : undefined,
-                }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `API错误: ${response.status}`);
-            }
-
-            const result = await response.json();
-            if (result.videoUrl) {
-                return {
-                    uri: result.videoUrl,
-                    isFallbackImage: false,
-                    videoMetadata: { taskId: result.taskId },
-                    uris: [result.videoUrl],
-                };
-            }
-            throw new Error('未返回视频URL');
-        } catch (e: any) {
-            console.error('[External Veo] Video Gen Error:', e);
-            // 回退到图像生成
-            try {
-                const fallbackPrompt = "Cinematic movie still, " + prompt;
-                const inputImages = inputImageBase64 ? [inputImageBase64] : [];
-                const imgs = await generateImageFromText(fallbackPrompt, 'gemini-2.5-flash-image', inputImages, { aspectRatio: options.aspectRatio });
-                return { uri: imgs[0], isFallbackImage: true };
-            } catch (imgErr) {
-                throw new Error("视频生成失败且图像回退也失败: " + getErrorMessage(e));
-            }
-        }
-    }
-
-    // --- Gemini 原生 Veo Path ---
     const ai = getClient();
 
     // --- Quality Optimization ---

@@ -1,9 +1,9 @@
-# SUNSTUDIO 集成方案
+# ls-studio 集成方案
 
 ## 项目概述
 
-### SUNSTUDIO 是什么？
-SUNSTUDIO 是一个基于 Google AI Studio 的**可视化节点编辑器**，专注于多模态 AI 内容生成工作流。它提供了一个类似 ComfyUI/Blender Nodes 的可视化编程界面，让用户通过拖拽和连接节点来创建复杂的 AI 生成管道。
+### ls-studio 是什么？
+ls-studio 是一个基于 Google AI Studio 的**可视化节点编辑器**，专注于多模态 AI 内容生成工作流。它提供了一个类似 ComfyUI/Blender Nodes 的可视化编程界面，让用户通过拖拽和连接节点来创建复杂的 AI 生成管道。
 
 ### 核心能力
 1. **节点系统** - 支持 6 种节点类型：
@@ -36,7 +36,7 @@ SUNSTUDIO 是一个基于 Google AI Studio 的**可视化节点编辑器**，专
 
 ## 当前技术栈分析
 
-### SUNSTUDIO（原项目）
+### ls-studio（原项目）
 ```json
 {
   "框架": "React 19 + TypeScript",
@@ -77,7 +77,7 @@ SUNSTUDIO 是一个基于 Google AI Studio 的**可视化节点编辑器**，专
 ## 集成架构设计
 
 ### 1. 模块定位
-SUNSTUDIO 作为第四个核心模块 **"Studio"** 集成到 Agent Platform：
+ls-studio 作为第四个核心模块 **"Studio"** 集成到 Agent Platform：
 
 | 模块 | 定位 | 路由 |
 |------|------|------|
@@ -95,7 +95,7 @@ web/src/
 │   │   ├── agent/
 │   │   ├── ground/
 │   │   ├── library/
-│   │   └── studio/                    # 🆕 新增 SUNSTUDIO 模块
+│   │   └── studio/                    # 🆕 新增 ls-studio 模块
 │   │       ├── StudioTab.js           # 主入口（替代原 App.tsx）
 │   │       ├── StudioTab.module.css   # 全局样式
 │   │       ├── components/            # 迁移所有组件
@@ -158,7 +158,7 @@ mkdir -p src/workspace/tabs/studio/{components,services}
 ### Phase 2: 组件迁移（核心功能）
 
 #### 2.1 主入口组件迁移
-将 `SUNSTUDIO/App.tsx` → `src/workspace/tabs/studio/StudioTab.js`
+将 `ls-studio/App.tsx` → `src/workspace/tabs/studio/StudioTab.js`
 
 **关键调整**：
 ```jsx
@@ -181,7 +181,7 @@ export default function StudioTab() {
 #### 2.2 组件文件迁移清单
 ```bash
 # 直接复制所有组件到新目录
-cp SUNSTUDIO/components/*.tsx src/workspace/tabs/studio/components/
+cp ls-studio/components/*.tsx src/workspace/tabs/studio/components/
 
 # 批量添加 'use client' 指令（所有组件都需要）
 for file in src/workspace/tabs/studio/components/*.tsx; do
@@ -190,7 +190,7 @@ done
 ```
 
 #### 2.3 样式处理
-SUNSTUDIO 使用内联样式，需要提取到 CSS Modules：
+ls-studio 使用内联样式，需要提取到 CSS Modules：
 
 **策略**：
 1. 保留 Tailwind 类名（项目已支持）
@@ -202,7 +202,7 @@ SUNSTUDIO 使用内联样式，需要提取到 CSS Modules：
 ### Phase 3: API 集成（关键改造）
 
 #### 3.1 统一 AI 服务层
-将 `SUNSTUDIO/services/geminiService.ts` 重构为通用 AI 服务：
+将 `ls-studio/services/geminiService.ts` 重构为通用 AI 服务：
 
 **文件**: `src/workspace/tabs/studio/services/aiService.js`
 
@@ -284,7 +284,7 @@ async function callImageGenerationAPI(prompt, count) {
 ```bash
 cd web
 
-# 添加 SUNSTUDIO 特有依赖
+# 添加 ls-studio 特有依赖
 bun add lucide-react
 
 # 如果保留 Gemini 支持
@@ -415,7 +415,7 @@ bun add @google/genai
 ## 下一步行动
 
 1. **立即执行**（今天）
-   - [x] 分析 SUNSTUDIO 架构 ✅
+   - [x] 分析 ls-studio 架构 ✅
    - [x] 编写集成方案文档 ✅
    - [ ] 更新标签配置
    - [ ] 创建 Studio 目录结构

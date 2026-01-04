@@ -1,4 +1,3 @@
-"use client";
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -96,40 +95,32 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
 
     // --- Drag & Drop (Spring Feel) ---
     const handleDragStart = (e: React.DragEvent, index: number) => {
-        e.stopPropagation();
         setDraggingIndex(index);
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.dropEffect = 'move';
-        // 使用当前拖拽元素作为拖拽图像，偏移到中心
-        const target = e.currentTarget as HTMLElement;
-        e.dataTransfer.setDragImage(target, target.offsetWidth / 2, target.offsetHeight / 2);
-    };
-
-    const handleDragEnd = (e: React.DragEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-        setDraggingIndex(null);
-        setDragOverIndex(null);
+        // Create invisible drag image to rely on our UI updates
+        const img = new Image();
+        img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        e.dataTransfer.setDragImage(img, 0, 0);
     };
 
     const handleDragOver = (e: React.DragEvent, index: number) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); // Necessary for drop
         if (draggingIndex === null) return;
         if (draggingIndex !== index) {
             setDragOverIndex(index);
-            // Live Reorder (Spring Swap)
+            // Optional: Live Reorder (Spring Swap)
+            // If we want "live" reordering, we manipulate 'frames' here.
+            // But standard behavior is usually onDrop. Let's do live swap for "spring" feel.
             const newFrames = [...frames];
             const [moved] = newFrames.splice(draggingIndex, 1);
             newFrames.splice(index, 0, moved);
             setFrames(newFrames);
-            setDraggingIndex(index);
+            setDraggingIndex(index); // Update drag index to new position
         }
     };
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
-        e.stopPropagation();
         setDraggingIndex(null);
         setDragOverIndex(null);
 
@@ -195,18 +186,15 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
     // --- Render ---
 
     const renderPlayer = () => (
-        <div
-            className={`
-                relative bg-white border border-slate-200 shadow-[0_25px_65px_rgba(15,23,42,0.12)] overflow-hidden flex items-center justify-center transition-all duration-500
-                ${isExpanded ? 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50vw] h-[28.125vw] max-w-[90vw] max-h-[80vh] z-[100] rounded-3xl shadow-[0_50px_120px_rgba(15,23,42,0.25)]' : 'w-[360px] h-[202px] rounded-2xl'}
-            `}
-            style={{ transitionTimingFunction: SPRING }}
-        >
+        <div className={`
+            relative bg-black border border-white/10 shadow-2xl overflow-hidden flex items-center justify-center transition-all duration-500 ease-[${SPRING}]
+            ${isExpanded ? 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50vw] h-[28.125vw] max-w-[90vw] max-h-[80vh] z-[100] rounded-2xl shadow-[0_0_100px_rgba(0,0,0,0.8)]' : 'w-[360px] h-[202px] rounded-xl'}
+        `}>
             {/* Top Left Controls (Expand / Download) */}
             <div className={`absolute top-3 left-3 flex gap-2 z-20 transition-opacity duration-200 ${isGenerating ? 'opacity-0' : 'opacity-0 hover:opacity-100 group-hover/player:opacity-100'}`}>
                 <button
                     onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-                    className="p-2 bg-white/90 backdrop-blur-md rounded-lg text-slate-700 hover:text-slate-900 border border-slate-300 hover:scale-105 transition-all"
+                    className="p-2 bg-black/60 backdrop-blur-md rounded-lg text-white/70 hover:text-white border border-white/10 hover:scale-105 transition-all"
                     title={isExpanded ? "退出全屏" : "放大预览"}
                 >
                     {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
@@ -216,7 +204,7 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                         href={resultVideoUrl}
                         download={`ls-studio_seq_${Date.now()}.mp4`}
                         onClick={(e) => e.stopPropagation()}
-                        className="p-2 bg-white/90 backdrop-blur-md rounded-lg text-slate-700 hover:text-slate-900 border border-slate-300 hover:scale-105 transition-all"
+                        className="p-2 bg-black/60 backdrop-blur-md rounded-lg text-white/70 hover:text-white border border-white/10 hover:scale-105 transition-all"
                         title="下载视频"
                     >
                         <Download size={16} />
@@ -227,8 +215,8 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
             {/* Playback Content */}
             {isGenerating ? (
                 <div className="flex flex-col items-center gap-3">
-                    <Loader2 size={32} className="animate-spin text-blue-500" />
-                    <span className="text-[10px] font-bold text-slate-600 tracking-widest uppercase animate-pulse">正在生成智能补帧...</span>
+                    <Loader2 size={32} className="animate-spin text-cyan-500" />
+                    <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase animate-pulse">正在生成智能补帧...</span>
                 </div>
             ) : resultVideoUrl ? (
                 <div className="relative w-full h-full group/video" onClick={togglePlay}>
@@ -241,8 +229,8 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                         onEnded={() => setIsPlaying(false)}
                     />
                     {!isPlaying && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur">
-                            <Play size={48} className="text-slate-600 fill-white/20" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
+                            <Play size={48} className="text-white/80 fill-white/20" />
                         </div>
                     )}
                 </div>
@@ -260,15 +248,15 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                             disabled={!resultVideoUrl}
                             className={`w-14 h-14 rounded-full flex items-center justify-center transition-all backdrop-blur-md group/play
                                 ${resultVideoUrl
-                                    ? 'bg-blue-500/20 hover:bg-blue-500/40 border border-blue-500/50 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
-                                    : 'bg-slate-50 border border-slate-300 cursor-default opacity-50'}
+                                    ? 'bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
+                                    : 'bg-white/5 border border-white/10 cursor-default opacity-50'}
                              `}
                         >
-                            {isPlaying ? <Pause size={24} className="text-slate-900" /> : <Play size={24} className="text-slate-900 ml-1" fill={resultVideoUrl ? "currentColor" : "none"} />}
+                            {isPlaying ? <Pause size={24} className="text-white" /> : <Play size={24} className="text-white ml-1" fill={resultVideoUrl ? "currentColor" : "none"} />}
                         </button>
                     </div>
                     {/* Info Overlay */}
-                    <div className="absolute top-2 right-2 px-2 py-1 bg-white/80 backdrop-blur rounded text-[9px] text-slate-600 font-mono border border-slate-200 pointer-events-none">
+                    <div className="absolute top-2 right-2 px-2 py-1 bg-black/50 backdrop-blur rounded text-[9px] text-slate-300 font-mono border border-white/5 pointer-events-none">
                         {totalDuration}s • {frames.length} Frames
                     </div>
                 </div>
@@ -286,15 +274,14 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
             {/* Expanded Backdrop */}
             {isExpanded && (
                 <div
-                    className="fixed inset-0 z-[90] bg-white/90 backdrop-blur-sm animate-in fade-in duration-300"
+                    className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm animate-in fade-in duration-300"
                     onClick={() => setIsExpanded(false)}
                 />
             )}
 
             <div
                 ref={dockRef}
-                className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[80] flex flex-col items-center gap-2 transition-all duration-500 animate-in slide-in-from-bottom-20 fade-in"
-                style={{ transitionTimingFunction: SPRING }}
+                className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[80] flex flex-col items-center gap-2 transition-all duration-500 ease-[${SPRING}] animate-in slide-in-from-bottom-20 fade-in`}
             >
                 {/* --- Layer 1: Player (Top) --- */}
                 <div className="relative group/player mb-2">
@@ -303,17 +290,17 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                         <>
                             <div
                                 onMouseDown={(e) => onConnectStart?.(e, 'input')}
-                                className="absolute -left-8 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-slate-200 bg-white shadow-md flex items-center justify-center opacity-0 group-hover/player:opacity-100 hover:scale-125 transition-all cursor-crosshair z-30"
+                                className="absolute -left-8 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-white/20 bg-[#1c1c1e] flex items-center justify-center opacity-0 group-hover/player:opacity-100 hover:scale-125 transition-all cursor-crosshair z-30"
                                 title="Connect Input"
                             >
-                                <Plus size={12} className="text-slate-500" />
+                                <Plus size={12} className="text-white/50" />
                             </div>
                             <div
                                 onMouseDown={(e) => onConnectStart?.(e, 'output')}
-                                className="absolute -right-8 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-slate-200 bg-white shadow-md flex items-center justify-center opacity-0 group-hover/player:opacity-100 hover:scale-125 transition-all cursor-crosshair z-30"
+                                className="absolute -right-8 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-white/20 bg-[#1c1c1e] flex items-center justify-center opacity-0 group-hover/player:opacity-100 hover:scale-125 transition-all cursor-crosshair z-30"
                                 title="Connect Output"
                             >
-                                <Plus size={12} className="text-slate-500" />
+                                <Plus size={12} className="text-white/50" />
                             </div>
                         </>
                     )}
@@ -323,10 +310,9 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
 
                 {/* --- Layer 2: Preview Strip (Middle) --- */}
                 <div
-                    className="w-full h-10 bg-slate-100/90 backdrop-blur-md rounded-t-lg border-t border-x border-slate-200 relative overflow-hidden flex cursor-crosshair group/strip"
+                    className="w-full h-6 bg-[#1c1c1e]/80 backdrop-blur-md rounded-t-lg border-t border-x border-white/5 relative overflow-hidden flex cursor-crosshair group/strip"
                     style={{ width: 'min(90vw, 820px)' }}
                     onMouseMove={(e) => {
-                        if (frames.length === 0) { setHoverIndex(null); return; }
                         const rect = e.currentTarget.getBoundingClientRect();
                         const index = Math.min(frames.length - 1, Math.floor(((e.clientX - rect.left) / rect.width) * frames.length));
                         setHoverIndex(index);
@@ -334,15 +320,15 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                     onMouseLeave={() => setHoverIndex(null)}
                 >
                     {frames.map((f, i) => (
-                        <div key={f.id} className="flex-1 h-full relative border-r border-slate-200/50 last:border-0 overflow-hidden flex items-center justify-center bg-slate-50/50">
-                            <img src={f.src} className="h-full object-contain opacity-60 group-hover/strip:opacity-80 transition-opacity" />
+                        <div key={f.id} className="flex-1 h-full relative border-r border-white/5 last:border-0 overflow-hidden">
+                            <img src={f.src} className="w-full h-full object-cover opacity-30 grayscale group-hover/strip:opacity-50 transition-opacity" />
                         </div>
                     ))}
 
                     {/* Hover Highlight */}
                     {hoverIndex !== null && frames.length > 0 && (
                         <div
-                            className="absolute top-0 bottom-0 bg-blue-500/20 border-x border-blue-500/50 pointer-events-none transition-all duration-75 ease-out"
+                            className="absolute top-0 bottom-0 bg-cyan-500/20 border-x border-cyan-500/50 pointer-events-none transition-all duration-75 ease-out"
                             style={{
                                 left: `${(hoverIndex / frames.length) * 100}%`,
                                 width: `${100 / frames.length}%`
@@ -353,15 +339,11 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
 
                 {/* --- Layer 3: Asset Dock (Bottom) --- */}
                 <div
-                    className="bg-white/95 backdrop-blur-2xl border border-slate-200 rounded-b-2xl rounded-t-sm shadow-[0_20px_65px_rgba(15,23,42,0.12)] p-4 flex items-center gap-4 relative z-10"
+                    className="bg-[#0a0a0c]/95 backdrop-blur-2xl border border-white/10 rounded-b-2xl rounded-t-sm shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-4 flex items-center gap-4 relative z-10"
                     style={{ width: 'min(90vw, 820px)' }}
-                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    onDragLeave={(e) => e.stopPropagation()}
-                    onDrop={(e) => { e.stopPropagation(); handleDrop(e); }}
                 >
                     {/* Apple Style Close Button on Left */}
-                    <button onClick={onClose} className="absolute -top-3 left-0 -translate-y-full p-2 text-slate-600 hover:text-slate-900 bg-white/80 backdrop-blur rounded-full border border-slate-300 transition-colors">
+                    <button onClick={onClose} className="absolute -top-3 left-0 -translate-y-full p-2 text-slate-400 hover:text-white bg-black/50 backdrop-blur rounded-full border border-white/10 transition-colors">
                         <X size={14} />
                     </button>
 
@@ -373,38 +355,34 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                                 <div
                                     className={`
                                         relative w-[72px] h-[72px] shrink-0 rounded-lg overflow-hidden border transition-all duration-300 ease-out group select-none
-                                        ${draggingIndex === index ? 'opacity-50 scale-95 ring-2 ring-blue-400' : 'border-slate-300 hover:border-white/30 bg-slate-50'}
+                                        ${draggingIndex === index ? 'opacity-30 scale-90 grayscale' : 'border-white/10 hover:border-white/30 bg-white/5'}
                                         ${dragOverIndex === index ? 'translate-x-2' : ''}
                                     `}
                                     onDragOver={(e) => handleDragOver(e, index)}
-                                    onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                    onDragLeave={(e) => e.stopPropagation()}
                                     onDrop={handleDrop}
                                 >
                                     <img src={frame.src} className="w-full h-full object-cover pointer-events-none" />
 
                                     {/* Index Badge */}
-                                    <div className="absolute top-0.5 right-0.5 w-4 h-4 bg-white/90 rounded-full flex items-center justify-center text-[8px] font-bold text-slate-800 pointer-events-none">
+                                    <div className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/60 rounded-full flex items-center justify-center text-[8px] font-bold text-white/80 pointer-events-none">
                                         {index + 1}
                                     </div>
 
                                     {/* Delete Button (Top Left) */}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); setFrames(p => p.filter(f => f.id !== frame.id)); }}
-                                        className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full flex items-center justify-center bg-white/90 hover:bg-red-500 text-slate-700 hover:text-slate-900 transition-colors opacity-0 group-hover:opacity-100 z-20"
+                                        className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full flex items-center justify-center bg-black/60 hover:bg-red-500 text-white/70 hover:text-white transition-colors opacity-0 group-hover:opacity-100 z-20"
                                     >
                                         <X size={10} strokeWidth={3} />
                                     </button>
 
                                     {/* Drag Handle (Center) */}
                                     <div
-                                        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-slate-100/80 backdrop-blur-[1px]"
+                                        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-black/20 backdrop-blur-[1px]"
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, index)}
-                                        onDragEnd={handleDragEnd}
-                                        onDrag={(e) => e.stopPropagation()}
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center border border-slate-400 text-slate-800 hover:scale-110 transition-transform">
+                                        <div className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center border border-white/20 text-white/80 hover:scale-110 transition-transform">
                                             <GripVertical size={16} />
                                         </div>
                                     </div>
@@ -413,15 +391,15 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                                 {/* Link / Transition Button */}
                                 {index < frames.length - 1 && (
                                     <div className="relative flex flex-col items-center justify-center w-6 shrink-0 z-10">
-                                        <div className="h-[2px] w-full bg-slate-100 absolute top-1/2 -translate-y-1/2 -z-10" />
+                                        <div className="h-[2px] w-full bg-white/10 absolute top-1/2 -translate-y-1/2 -z-10" />
                                         <button
                                             data-link-btn
                                             onClick={() => openTransitionEditor(frame.id, frame.transition)}
                                             className={`
                                                 w-5 h-5 rounded-full flex items-center justify-center transition-all hover:scale-110 border
                                                 ${frame.transition.prompt
-                                                    ? 'bg-blue-500 border-blue-400 text-black shadow-[0_0_10px_rgba(6,182,212,0.5)]'
-                                                    : 'bg-[#ffffff] border-slate-400 text-slate-500 hover:text-slate-900 hover:border-white'}
+                                                    ? 'bg-cyan-500 border-cyan-400 text-black shadow-[0_0_10px_rgba(6,182,212,0.5)]'
+                                                    : 'bg-[#2c2c2e] border-white/20 text-slate-500 hover:text-white hover:border-white'}
                                             `}
                                         >
                                             <Link size={10} strokeWidth={2.5} />
@@ -435,14 +413,12 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                         {/* Add Button */}
                         {frames.length < 10 && (
                             <div
-                                className="w-[72px] h-[72px] shrink-0 rounded-lg border border-dashed border-slate-300 hover:border-blue-400 bg-slate-50 hover:bg-blue-50 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all group active:scale-95"
+                                className="w-[72px] h-[72px] shrink-0 rounded-lg border border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 flex flex-col items-center justify-center gap-1 cursor-pointer transition-all group active:scale-95"
                                 onClick={() => fileInputRef.current?.click()}
-                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                onDragLeave={(e) => e.stopPropagation()}
-                                onDrop={(e) => { e.stopPropagation(); handleDrop(e); }}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={handleDrop}
                             >
-                                <Plus size={18} className="text-slate-500 group-hover:text-slate-900 transition-colors" />
+                                <Plus size={18} className="text-slate-500 group-hover:text-white transition-colors" />
                                 <span className="text-[9px] text-slate-500 font-medium">Add</span>
                             </div>
                         )}
@@ -450,10 +426,10 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                     </div>
 
                     {/* Right Action Column */}
-                    <div className="pl-4 border-l border-slate-300 flex flex-col gap-2 shrink-0">
+                    <div className="pl-4 border-l border-white/10 flex flex-col gap-2 shrink-0">
                         <button
                             onClick={() => setFrames([])}
-                            className="p-2 rounded-lg bg-slate-50 hover:bg-red-500/20 text-slate-600 hover:text-red-400 transition-colors"
+                            className="p-2 rounded-lg bg-white/5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
                             title="全部清空"
                         >
                             <Trash2 size={14} />
@@ -463,7 +439,7 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                             disabled={frames.length < 2 || isGenerating}
                             className={`
                                 w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-lg
-                                ${frames.length >= 2 && !isGenerating ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-900 hover:scale-110 hover:shadow-cyan-500/30' : 'bg-slate-100 text-slate-600 cursor-not-allowed'}
+                                ${frames.length >= 2 && !isGenerating ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white hover:scale-110 hover:shadow-cyan-500/30' : 'bg-white/10 text-slate-600 cursor-not-allowed'}
                             `}
                             title="生成视频"
                         >
@@ -476,19 +452,19 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                 {editingTransitionId && (
                     <div
                         ref={transitionModalRef}
-                        className="absolute bottom-[130px] z-[100] w-[240px] aspect-[9/16] bg-slate-50 border border-slate-300 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.9)] flex flex-col animate-in slide-in-from-bottom-4 zoom-in-95 duration-300 overflow-hidden"
+                        className="absolute bottom-[130px] z-[100] w-[240px] aspect-[9/16] bg-[#18181b] border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.9)] flex flex-col animate-in slide-in-from-bottom-4 zoom-in-95 duration-300 overflow-hidden"
                         style={{ left: '50%', transform: 'translateX(-50%)' }}
                     >
                         {/* Header */}
-                        <div className="px-4 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                            <span className="text-xs font-bold text-slate-700 tracking-wide">运镜描述</span>
-                            <button onClick={() => saveTransition()} className="text-slate-500 hover:text-slate-900"><X size={12} /></button>
+                        <div className="px-4 py-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                            <span className="text-xs font-bold text-slate-200 tracking-wide">运镜描述</span>
+                            <button onClick={() => saveTransition()} className="text-slate-500 hover:text-white"><X size={12} /></button>
                         </div>
 
                         {/* Textarea */}
                         <div className="flex-1 p-4">
                             <textarea
-                                className="w-full h-full bg-white border border-slate-300 rounded-xl p-3 text-xs text-slate-700 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 resize-none leading-relaxed custom-scrollbar shadow-inner"
+                                className="w-full h-full bg-[#09090b] border border-white/10 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 resize-none leading-relaxed custom-scrollbar shadow-inner"
                                 placeholder="描述镜头之间的转换..."
                                 value={tempPrompt}
                                 onChange={(e) => setTempPrompt(e.target.value)}
@@ -498,15 +474,15 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
 
                         {/* Footer Actions */}
                         <div className="p-4 pt-0 flex flex-col gap-3">
-                            <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-3 py-2">
+                            <div className="flex items-center gap-2 bg-[#09090b] border border-white/10 rounded-xl px-3 py-2">
                                 <Clock size={12} className="text-slate-500 shrink-0" />
                                 <input
                                     type="range" min="1" max="6" step="0.5"
                                     value={tempDuration}
                                     onChange={(e) => setTempDuration(parseFloat(e.target.value))}
-                                    className="flex-1 h-1 bg-slate-100 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 cursor-pointer"
+                                    className="flex-1 h-1 bg-white/10 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-500 cursor-pointer"
                                 />
-                                <span className="text-[10px] font-mono text-slate-600 min-w-[24px] text-right">{tempDuration}s</span>
+                                <span className="text-[10px] font-mono text-slate-300 min-w-[24px] text-right">{tempDuration}s</span>
                             </div>
                             <button
                                 onClick={saveTransition}
@@ -517,7 +493,7 @@ export const SmartSequenceDock: React.FC<SmartSequenceDockProps> = ({ isOpen, on
                         </div>
 
                         {/* Pointer Arrow */}
-                        <div className="absolute bottom-[-5px] left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-50 border-r border-b border-slate-300 rotate-45 pointer-events-none" />
+                        <div className="absolute bottom-[-5px] left-1/2 -translate-x-1/2 w-3 h-3 bg-[#18181b] border-r border-b border-white/10 rotate-45 pointer-events-none" />
                     </div>
                 )}
             </div>
