@@ -37,6 +37,8 @@ interface NodeProps {
     isSelected?: boolean;
     isResizing?: boolean;
     isConnecting?: boolean;
+    // 拖拽偏移量：用 transform 实现流畅拖拽
+    dragOffset?: { x: number, y: number };
 }
 
 const IMAGE_ASPECT_RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9'];
@@ -856,9 +858,10 @@ const NodeComponent: React.FC<NodeProps> = ({
     const isInteracting = isDragging || isResizing || isGroupDragging;
     return (
         <div
-            className={`absolute rounded-[24px] group ${isSelected ? 'ring-2 ring-blue-300/60 shadow-[0_20px_60px_rgba(59,130,246,0.15)] z-30' : 'ring-1 ring-slate-200/80 hover:ring-blue-200/60 z-10'}`}
+            className={`absolute rounded-[24px] group ${isSelected ? 'ring-2 ring-blue-300/60 shadow-[0_20px_60px_rgba(59,130,246,0.15)]' : 'ring-1 ring-slate-200/80 hover:ring-blue-200/60'}`}
             style={{
                 left: node.x, top: node.y, width: nodeWidth, height: nodeHeight,
+                zIndex: isSelected ? 50 : 10,
                 background: isSelected ? 'rgba(255, 255, 255, 0.96)' : 'rgba(250, 250, 255, 0.9)',
                 transition: isInteracting ? 'none' : 'all 0.5s cubic-bezier(0.32, 0.72, 0, 1)',
                 backdropFilter: isInteracting ? 'none' : 'blur(18px)',

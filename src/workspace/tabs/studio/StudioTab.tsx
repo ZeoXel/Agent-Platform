@@ -6,14 +6,13 @@ import { Node } from './components/Node';
 import { SidebarDock } from './components/SidebarDock';
 import { AssistantPanel } from './components/AssistantPanel';
 import { ImageCropper } from './components/ImageCropper';
-import { SketchEditor } from './components/SketchEditor'; 
+import { SketchEditor } from './components/SketchEditor';
 import { SmartSequenceDock } from './components/SmartSequenceDock';
-import { SonicStudio } from './components/SonicStudio'; 
 import { SettingsModal } from './components/SettingsModal';
-import { AppNode, NodeType, NodeStatus, Connection, ContextMenuState, Group, Workflow, SmartSequenceItem } from './types';
+import { AppNode, NodeType, NodeStatus, Connection, ContextMenuState, Group, Workflow, SmartSequenceItem, Canvas } from './types';
 import { generateImageFromText, generateVideo, analyzeVideo, editImageWithText, planStoryboard, orchestrateVideoPrompt, compileMultiFramePrompt, urlToBase64, extractLastFrame, generateAudio } from './services/geminiService';
 import { getGenerationStrategy } from './services/videoStrategies';
-import { createMusic, SunoSongInfo } from './services/sunoService';
+import { createMusicCustom, SunoSongInfo } from './services/sunoService';
 import { synthesizeSpeech, MinimaxGenerateParams } from './services/minimaxService';
 import { saveToStorage, loadFromStorage } from './services/storage';
 import { 
@@ -166,11 +165,12 @@ export default function StudioTab() {
   // Multi-Frame Dock State
   const [isMultiFrameOpen, setIsMultiFrameOpen] = useState(false);
 
-  // Sonic Studio (Music) State
-  const [isSonicStudioOpen, setIsSonicStudioOpen] = useState(false);
-  
   // Settings State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Canvas Management State
+  const [canvases, setCanvases] = useState<Canvas[]>([]);
+  const [currentCanvasId, setCurrentCanvasId] = useState<string | null>(null);
 
   // --- Canvas State ---
   const [nodes, setNodes] = useState<AppNode[]>([]);
@@ -239,15 +239,17 @@ export default function StudioTab() {
   
   // Interaction Refs
   const dragNodeRef = useRef<{
-      id: string, 
-      startX: number, 
-      startY: number, 
-      mouseStartX: number, 
+      id: string,
+      startX: number,
+      startY: number,
+      mouseStartX: number,
       mouseStartY: number,
       parentGroupId?: string | null,
       siblingNodeIds: string[],
       nodeWidth: number,
-      nodeHeight: number
+      nodeHeight: number,
+      // 多选拖动：其他被选中节点的初始位置
+      otherSelectedNodes?: { id: string, startX: number, startY: number }[]
   } | null>(null);
 
   const resizeContextRef = useRef<{
@@ -289,34 +291,72 @@ export default function StudioTab() {
           try {
             const sAssets = await loadFromStorage<any[]>('assets'); if (sAssets) setAssetHistory(sAssets);
             const sWfs = await loadFromStorage<Workflow[]>('workflows'); if (sWfs) setWorkflows(sWfs);
-            const sNodes = await loadFromStorage<AppNode[]>('nodes'); if (sNodes) setNodes(sNodes);
-            const sConns = await loadFromStorage<Connection[]>('connections');
-            if (sConns) {
-              // Deduplicate connections on load
-              const uniqueConns = sConns.filter((conn, idx, arr) =>
-                arr.findIndex(c => c.from === conn.from && c.to === conn.to) === idx
-              );
-              setConnections(uniqueConns);
+
+            // Load canvases
+            const sCanvases = await loadFromStorage<Canvas[]>('canvases');
+            const sCurrentCanvasId = await loadFromStorage<string>('currentCanvasId');
+
+            if (sCanvases && sCanvases.length > 0) {
+              setCanvases(sCanvases);
+              // 恢复上次使用的画布
+              const canvasToLoad = sCurrentCanvasId
+                ? sCanvases.find(c => c.id === sCurrentCanvasId) || sCanvases[0]
+                : sCanvases[0];
+              setCurrentCanvasId(canvasToLoad.id);
+              setNodes(JSON.parse(JSON.stringify(canvasToLoad.nodes)));
+              setConnections(JSON.parse(JSON.stringify(canvasToLoad.connections)));
+              setGroups(JSON.parse(JSON.stringify(canvasToLoad.groups)));
+            } else {
+              // 兼容旧数据：如果没有画布数据，从旧的 nodes/connections/groups 迁移
+              const sNodes = await loadFromStorage<AppNode[]>('nodes');
+              const sConns = await loadFromStorage<Connection[]>('connections');
+              const sGroups = await loadFromStorage<Group[]>('groups');
+
+              const now = Date.now();
+              const defaultCanvas: Canvas = {
+                id: `canvas-${now}`,
+                title: '默认画布',
+                nodes: sNodes || [],
+                connections: sConns ? sConns.filter((conn, idx, arr) =>
+                  arr.findIndex(c => c.from === conn.from && c.to === conn.to) === idx
+                ) : [],
+                groups: sGroups || [],
+                createdAt: now,
+                updatedAt: now
+              };
+
+              setCanvases([defaultCanvas]);
+              setCurrentCanvasId(defaultCanvas.id);
+              if (sNodes) setNodes(sNodes);
+              if (sConns) {
+                const uniqueConns = sConns.filter((conn, idx, arr) =>
+                  arr.findIndex(c => c.from === conn.from && c.to === conn.to) === idx
+                );
+                setConnections(uniqueConns);
+              }
+              if (sGroups) setGroups(sGroups);
             }
-            const sGroups = await loadFromStorage<Group[]>('groups'); if (sGroups) setGroups(sGroups);
           } catch (e) {
             console.error("Failed to load storage", e);
           } finally {
-            setIsLoaded(true); 
+            setIsLoaded(true);
           }
       };
       loadData();
   }, []);
 
   useEffect(() => {
-      if (!isLoaded) return; 
-      
+      if (!isLoaded) return;
+
       saveToStorage('assets', assetHistory);
       saveToStorage('workflows', workflows);
+      saveToStorage('canvases', canvases);
+      saveToStorage('currentCanvasId', currentCanvasId);
+      // 保留旧的 keys 用于向后兼容，但主要数据在 canvases 中
       saveToStorage('nodes', nodes);
       saveToStorage('connections', connections);
       saveToStorage('groups', groups);
-  }, [assetHistory, workflows, nodes, connections, groups, isLoaded]);
+  }, [assetHistory, workflows, nodes, connections, groups, canvases, currentCanvasId, isLoaded]);
 
   
   const getApproxNodeHeight = (node: AppNode) => {
@@ -472,7 +512,7 @@ export default function StudioTab() {
           generationMode: type === NodeType.VIDEO_GENERATOR ? 'DEFAULT' : undefined,
           // 音频节点默认配置
           audioMode: type === NodeType.AUDIO_GENERATOR ? defaultAudioMode : undefined,
-          musicConfig: type === NodeType.AUDIO_GENERATOR ? { mv: 'v3.5', tags: 'pop, catchy' } : undefined,
+          musicConfig: type === NodeType.AUDIO_GENERATOR ? { mv: 'chirp-v4', tags: 'pop, catchy' } : undefined,
           voiceConfig: type === NodeType.AUDIO_GENERATOR ? { voiceId: 'female-shaonv', speed: 1, emotion: 'calm' } : undefined,
           ...initialData
       };
@@ -653,20 +693,23 @@ export default function StudioTab() {
           }
           
           if (draggingNodeId && dragNodeRef.current && dragNodeRef.current.id === draggingNodeId) {
-             const { startX, startY, mouseStartX, mouseStartY, nodeWidth, nodeHeight } = dragNodeRef.current;
+             const { startX, startY, mouseStartX, mouseStartY, nodeWidth, nodeHeight, otherSelectedNodes } = dragNodeRef.current;
              let dx = (clientX - mouseStartX) / scale;
              let dy = (clientY - mouseStartY) / scale;
              let proposedX = startX + dx;
              let proposedY = startY + dy;
-             
-             // Snap Logic
-             const SNAP = SNAP_THRESHOLD / scale; 
+
+             // 获取所有正在拖动的节点 ID（主节点 + 其他选中节点）
+             const draggingIds = new Set([draggingNodeId, ...(otherSelectedNodes?.map(n => n.id) || [])]);
+
+             // Snap Logic（只对非拖动中的节点进行吸附检测）
+             const SNAP = SNAP_THRESHOLD / scale;
              const myL = proposedX; const myC = proposedX + nodeWidth / 2; const myR = proposedX + nodeWidth;
              const myT = proposedY; const myM = proposedY + nodeHeight / 2; const myB = proposedY + nodeHeight;
              let snappedX = false; let snappedY = false;
-             
+
              nodesRef.current.forEach(other => {
-                 if (other.id === draggingNodeId) return;
+                 if (draggingIds.has(other.id)) return; // 跳过所有正在拖动的节点
                  const otherBounds = getNodeBounds(other);
                  if (!snappedX) {
                      if (Math.abs(myL - otherBounds.x) < SNAP) { proposedX = otherBounds.x; snappedX = true; }
@@ -684,11 +727,26 @@ export default function StudioTab() {
                  }
              });
 
-             setNodes(prev => prev.map(n => n.id === draggingNodeId ? { ...n, x: proposedX, y: proposedY } : n));
-             
+             // 计算实际位移（考虑吸附后的调整）
+             const actualDx = proposedX - startX;
+             const actualDy = proposedY - startY;
+
+             // 同时移动主节点和其他选中节点
+             setNodes(prev => prev.map(n => {
+                 if (n.id === draggingNodeId) {
+                     return { ...n, x: proposedX, y: proposedY };
+                 }
+                 // 移动其他选中的节点
+                 const otherNode = otherSelectedNodes?.find(on => on.id === n.id);
+                 if (otherNode) {
+                     return { ...n, x: otherNode.startX + actualDx, y: otherNode.startY + actualDy };
+                 }
+                 return n;
+             }));
+
           } else if (draggingNodeId) {
-              const dx = (clientX - lastMousePos.x) / scale; 
-              const dy = (clientY - lastMousePos.y) / scale; 
+              const dx = (clientX - lastMousePos.x) / scale;
+              const dy = (clientY - lastMousePos.y) / scale;
               setNodes(prev => prev.map(n => n.id === draggingNodeId ? { ...n, x: n.x + dx, y: n.y + dy } : n));
               setLastMousePos({ x: clientX, y: clientY });
           }
@@ -703,20 +761,23 @@ export default function StudioTab() {
   const handleGlobalMouseUp = useCallback(() => {
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
       if (selectionRect) {
-          const x = Math.min(selectionRect.startX, selectionRect.currentX); const y = Math.min(selectionRect.startY, selectionRect.currentY);
-          const w = Math.abs(selectionRect.currentX - selectionRect.startX); const h = Math.abs(selectionRect.currentY - selectionRect.startY);
-          if (w > 10) {
+          const x = Math.min(selectionRect.startX, selectionRect.currentX);
+          const y = Math.min(selectionRect.startY, selectionRect.currentY);
+          const w = Math.abs(selectionRect.currentX - selectionRect.startX);
+          const h = Math.abs(selectionRect.currentY - selectionRect.startY);
+          if (w > 10 && h > 10) {
               const rect = { x: (x - pan.x) / scale, y: (y - pan.y) / scale, w: w / scale, h: h / scale };
-              const enclosed = nodesRef.current.filter(n => { const cx = n.x + (n.width||420)/2; const cy = n.y + 160; return cx>rect.x && cx<rect.x+rect.w && cy>rect.y && cy<rect.y+rect.h; });
-              if (enclosed.length > 0) { saveHistory(); 
-                  const freeNodes = enclosed.filter(n => {
-                      const cx = n.x + (n.width || 420) / 2; const cy = n.y + 160;
-                      return !groupsRef.current.some(g => cx > g.x && cx < g.x + g.width && cy > g.y && cy < g.y + g.height);
-                  });
-                  if (freeNodes.length > 0) {
-                      const fMinX=Math.min(...freeNodes.map(n=>n.x)), fMinY=Math.min(...freeNodes.map(n=>n.y)), fMaxX=Math.max(...freeNodes.map(n=>n.x+(n.width||420))), fMaxY=Math.max(...freeNodes.map(n=>n.y+320));
-                      setGroups(prev => [...prev, { id: `g-${Date.now()}`, title: '新建分组', x: fMinX-32, y: fMinY-32, width: (fMaxX-fMinX)+64, height: (fMaxY-fMinY)+64 }]);
-                  }
+              // 选中框选区域内的节点（以节点中心判断）
+              const enclosed = nodesRef.current.filter(n => {
+                  const cx = n.x + (n.width || 420) / 2;
+                  const cy = n.y + 160;
+                  return cx > rect.x && cx < rect.x + rect.w && cy > rect.y && cy < rect.y + rect.h;
+              });
+              // 只选中节点，不自动创建分组
+              if (enclosed.length > 0) {
+                  setSelectedNodeIds(enclosed.map(n => n.id));
+              } else {
+                  setSelectedNodeIds([]);
               }
           }
           setSelectionRect(null);
@@ -1133,11 +1194,15 @@ export default function StudioTab() {
               const audioMode = node.data.audioMode || 'music';
 
               if (audioMode === 'music') {
-                  // Suno V2 音乐生成（灵感模式）
+                  // Suno 音乐生成（自定义创作模式）
                   const musicConfig = node.data.musicConfig || {};
-                  const songs = await createMusic(
+                  const songs = await createMusicCustom(
                       {
-                          prompt,
+                          title: musicConfig.title || undefined,
+                          tags: musicConfig.tags || undefined,
+                          negative_tags: musicConfig.negativeTags || undefined,
+                          prompt: prompt || undefined,
+                          mv: musicConfig.mv || 'chirp-v4',
                           make_instrumental: musicConfig.instrumental || false,
                       },
                       (progressText, songData) => {
@@ -1264,6 +1329,101 @@ export default function StudioTab() {
 
   const deleteWorkflow = (id: string) => { setWorkflows(prev => prev.filter(w => w.id !== id)); if (selectedWorkflowId === id) setSelectedWorkflowId(null); };
   const renameWorkflow = (id: string, newTitle: string) => { setWorkflows(prev => prev.map(w => w.id === id ? { ...w, title: newTitle } : w)); };
+
+  // --- Canvas Management ---
+  const saveCurrentCanvas = useCallback(() => {
+    if (!currentCanvasId) return;
+    const now = Date.now();
+    setCanvases(prev => prev.map(c =>
+      c.id === currentCanvasId
+        ? { ...c, nodes: JSON.parse(JSON.stringify(nodes)), connections: JSON.parse(JSON.stringify(connections)), groups: JSON.parse(JSON.stringify(groups)), updatedAt: now }
+        : c
+    ));
+  }, [currentCanvasId, nodes, connections, groups]);
+
+  const createNewCanvas = useCallback(() => {
+    // 先保存当前画布
+    if (currentCanvasId && nodes.length > 0) {
+      saveCurrentCanvas();
+    }
+
+    const now = Date.now();
+    const newCanvas: Canvas = {
+      id: `canvas-${now}-${Math.floor(Math.random() * 1000)}`,
+      title: `画布 ${canvases.length + 1}`,
+      nodes: [],
+      connections: [],
+      groups: [],
+      createdAt: now,
+      updatedAt: now
+    };
+
+    setCanvases(prev => [newCanvas, ...prev]);
+    setCurrentCanvasId(newCanvas.id);
+    setNodes([]);
+    setConnections([]);
+    setGroups([]);
+    setSelectedNodeIds([]);
+    setSelectedGroupId(null);
+  }, [currentCanvasId, nodes.length, canvases.length, saveCurrentCanvas]);
+
+  const selectCanvas = useCallback((id: string) => {
+    if (id === currentCanvasId) return;
+
+    // 保存当前画布
+    if (currentCanvasId) {
+      saveCurrentCanvas();
+    }
+
+    // 加载选中的画布
+    const canvas = canvases.find(c => c.id === id);
+    if (canvas) {
+      setNodes(JSON.parse(JSON.stringify(canvas.nodes)));
+      setConnections(JSON.parse(JSON.stringify(canvas.connections)));
+      setGroups(JSON.parse(JSON.stringify(canvas.groups)));
+      setCurrentCanvasId(id);
+      setSelectedNodeIds([]);
+      setSelectedGroupId(null);
+    }
+  }, [currentCanvasId, canvases, saveCurrentCanvas]);
+
+  const deleteCanvas = useCallback((id: string) => {
+    if (canvases.length <= 1) {
+      // 如果只剩一个画布，不允许删除，而是清空它
+      setNodes([]);
+      setConnections([]);
+      setGroups([]);
+      return;
+    }
+
+    setCanvases(prev => {
+      const newCanvases = prev.filter(c => c.id !== id);
+      // 如果删除的是当前画布，切换到第一个
+      if (id === currentCanvasId && newCanvases.length > 0) {
+        const firstCanvas = newCanvases[0];
+        setNodes(JSON.parse(JSON.stringify(firstCanvas.nodes)));
+        setConnections(JSON.parse(JSON.stringify(firstCanvas.connections)));
+        setGroups(JSON.parse(JSON.stringify(firstCanvas.groups)));
+        setCurrentCanvasId(firstCanvas.id);
+      }
+      return newCanvases;
+    });
+    setSelectedNodeIds([]);
+    setSelectedGroupId(null);
+  }, [canvases, currentCanvasId]);
+
+  const renameCanvas = useCallback((id: string, newTitle: string) => {
+    setCanvases(prev => prev.map(c => c.id === id ? { ...c, title: newTitle, updatedAt: Date.now() } : c));
+  }, []);
+
+  // 自动保存当前画布（节流）
+  useEffect(() => {
+    if (!currentCanvasId || !isLoaded) return;
+    const timer = setTimeout(() => {
+      saveCurrentCanvas();
+    }, 2000); // 2秒后自动保存
+    return () => clearTimeout(timer);
+  }, [nodes, connections, groups, currentCanvasId, isLoaded, saveCurrentCanvas]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -1395,7 +1555,16 @@ export default function StudioTab() {
           className={`w-full h-full overflow-hidden text-slate-700 selection:bg-blue-200 ${isDraggingCanvas ? 'cursor-grabbing' : 'cursor-default'} ${(isDraggingCanvas || draggingNodeId || resizingNodeId || connectionStart || selectionRect || draggingGroup) ? 'select-none' : ''}`}
           onMouseDown={handleCanvasMouseDown}
           onDoubleClick={(e) => { e.preventDefault(); if (e.detail > 1 && !selectionRect) { setContextMenu({ visible: true, x: e.clientX, y: e.clientY, id: '' }); setContextMenuTarget({ type: 'create' }); } }}
-          onContextMenu={(e) => { e.preventDefault(); if(e.target === e.currentTarget) setContextMenu(null); }}
+          onContextMenu={(e) => {
+              e.preventDefault();
+              // 如果有多个节点被选中，显示多选菜单
+              if (selectedNodeIds.length > 1) {
+                  setContextMenu({ visible: true, x: e.clientX, y: e.clientY, id: '' });
+                  setContextMenuTarget({ type: 'multi-selection', ids: selectedNodeIds });
+              } else if (e.target === e.currentTarget) {
+                  setContextMenu(null);
+              }
+          }}
           onDragOver={handleCanvasDragOver} onDrop={handleCanvasDrop}
       >
           <div className="absolute inset-0 noise-bg" />
@@ -1454,7 +1623,7 @@ export default function StudioTab() {
                           dragGroupRef.current = { id: g.id, startX: g.x, startY: g.y, mouseStartX: e.clientX, mouseStartY: e.clientY, childNodes };
                           setActiveGroupNodeIds(childNodes.map(c => c.id)); setDraggingGroup({ id: g.id });
                       }} 
-                      onContextMenu={e => { e.stopPropagation(); setContextMenu({visible:true, x:e.clientX, y:e.clientY, id:g.id}); setContextMenuTarget({type:'group', id:g.id}); }}
+                      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({visible:true, x:e.clientX, y:e.clientY, id:g.id}); setContextMenuTarget({type:'group', id:g.id}); }}
                   >
                       <div className="absolute -top-8 left-4 text-xs font-bold text-slate-400 uppercase tracking-widest">{g.title}</div>
                   </div>
@@ -1530,15 +1699,63 @@ export default function StudioTab() {
                   onNodeMouseDown={(e, id) => {
                       e.stopPropagation();
                       e.preventDefault(); // 防止拖拽选中文本
-                      if (e.shiftKey || e.metaKey || e.ctrlKey) { setSelectedNodeIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]); } else { setSelectedNodeIds([id]); }
+
+                      // 处理选择逻辑
+                      let currentSelection = selectedNodeIds;
+                      if (e.shiftKey || e.metaKey || e.ctrlKey) {
+                          // Shift/Ctrl/Meta 点击：切换选择
+                          currentSelection = selectedNodeIds.includes(id)
+                              ? selectedNodeIds.filter(i => i !== id)
+                              : [...selectedNodeIds, id];
+                          setSelectedNodeIds(currentSelection);
+                      } else if (!selectedNodeIds.includes(id)) {
+                          // 点击未选中的节点：只选中当前节点
+                          currentSelection = [id];
+                          setSelectedNodeIds(currentSelection);
+                      }
+                      // 如果点击已选中的节点，保持当前选择不变（允许拖动多选）
+
                       const n = nodes.find(x => x.id === id);
                       if (n) {
-                          const w = n.width || 420; const h = n.height || getApproxNodeHeight(n); const cx = n.x + w/2; const cy = n.y + 160; 
-                          const pGroup = groups.find(g => { return cx > g.x && cx < g.x + g.width && cy > g.y && cy < g.y + g.height; });
+                          const w = n.width || 420;
+                          const h = n.height || getApproxNodeHeight(n);
+                          const cx = n.x + w / 2;
+                          const cy = n.y + 160;
+                          const pGroup = groups.find(g => cx > g.x && cx < g.x + g.width && cy > g.y && cy < g.y + g.height);
                           let siblingNodeIds: string[] = [];
-                          if (pGroup) { siblingNodeIds = nodes.filter(other => { if (other.id === id) return false; const b = getNodeBounds(other); const ocx = b.x + b.width/2; const ocy = b.y + b.height/2; return ocx > pGroup.x && ocx < pGroup.x + pGroup.width && ocy > pGroup.y && ocy < pGroup.y + pGroup.height; }).map(s => s.id); }
-                          dragNodeRef.current = { id, startX: n.x, startY: n.y, mouseStartX: e.clientX, mouseStartY: e.clientY, parentGroupId: pGroup?.id, siblingNodeIds, nodeWidth: w, nodeHeight: h };
-                          setDraggingNodeParentGroupId(pGroup?.id || null); setDraggingNodeId(id); 
+                          if (pGroup) {
+                              siblingNodeIds = nodes.filter(other => {
+                                  if (other.id === id) return false;
+                                  const b = getNodeBounds(other);
+                                  const ocx = b.x + b.width / 2;
+                                  const ocy = b.y + b.height / 2;
+                                  return ocx > pGroup.x && ocx < pGroup.x + pGroup.width && ocy > pGroup.y && ocy < pGroup.y + pGroup.height;
+                              }).map(s => s.id);
+                          }
+
+                          // 记录其他选中节点的初始位置（用于多选拖动）
+                          const otherSelectedNodes = currentSelection
+                              .filter(nodeId => nodeId !== id)
+                              .map(nodeId => {
+                                  const node = nodes.find(x => x.id === nodeId);
+                                  return node ? { id: nodeId, startX: node.x, startY: node.y } : null;
+                              })
+                              .filter((item): item is { id: string, startX: number, startY: number } => item !== null);
+
+                          dragNodeRef.current = {
+                              id,
+                              startX: n.x,
+                              startY: n.y,
+                              mouseStartX: e.clientX,
+                              mouseStartY: e.clientY,
+                              parentGroupId: pGroup?.id,
+                              siblingNodeIds,
+                              nodeWidth: w,
+                              nodeHeight: h,
+                              otherSelectedNodes
+                          };
+                          setDraggingNodeParentGroupId(pGroup?.id || null);
+                          setDraggingNodeId(id);
                       }
                   }}
                   onPortMouseDown={(e, id, type) => {
@@ -1634,6 +1851,48 @@ export default function StudioTab() {
                   {contextMenuTarget?.type === 'connection' && (
                       <button className="w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 rounded-lg flex items-center gap-2 transition-colors" onClick={() => { setConnections(prev => prev.filter(c => c.from !== contextMenuTarget.from || c.to !== contextMenuTarget.to)); setNodes(prev => prev.map(n => n.id === contextMenuTarget.to ? { ...n, inputs: n.inputs.filter(i => i !== contextMenuTarget.from) } : n)); setContextMenu(null); }}> <Unplug size={12} /> 删除连接线 </button>
                   )}
+                  {contextMenuTarget?.type === 'multi-selection' && (
+                      <>
+                          <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                              已选中 {contextMenuTarget.ids?.length || 0} 个节点
+                          </div>
+                          <button
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-blue-500/20 hover:text-blue-600 rounded-lg flex items-center gap-2 transition-colors"
+                              onClick={() => {
+                                  const selectedNodes = nodes.filter(n => contextMenuTarget.ids?.includes(n.id));
+                                  if (selectedNodes.length > 0) {
+                                      saveHistory();
+                                      const minX = Math.min(...selectedNodes.map(n => n.x));
+                                      const minY = Math.min(...selectedNodes.map(n => n.y));
+                                      const maxX = Math.max(...selectedNodes.map(n => n.x + (n.width || 420)));
+                                      const maxY = Math.max(...selectedNodes.map(n => n.y + 320));
+                                      setGroups(prev => [...prev, {
+                                          id: `g-${Date.now()}`,
+                                          title: '新建分组',
+                                          x: minX - 32,
+                                          y: minY - 32,
+                                          width: (maxX - minX) + 64,
+                                          height: (maxY - minY) + 64
+                                      }]);
+                                  }
+                                  setContextMenu(null);
+                              }}
+                          >
+                              <LayoutTemplate size={12} /> 新建分组
+                          </button>
+                          <button
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 rounded-lg flex items-center gap-2 transition-colors"
+                              onClick={() => {
+                                  if (contextMenuTarget.ids) {
+                                      deleteNodes(contextMenuTarget.ids);
+                                  }
+                                  setContextMenu(null);
+                              }}
+                          >
+                              <Trash2 size={12} /> 删除选中节点
+                          </button>
+                      </>
+                  )}
               </div>
           )}
           
@@ -1652,23 +1911,15 @@ export default function StudioTab() {
                  setConnectionStart({ id: 'smart-sequence-dock', portType: 'output', screenX: rect.left + rect.width / 2, screenY: rect.top + rect.height / 2 });
              }}
           />
-          <SonicStudio 
-            isOpen={isSonicStudioOpen}
-            onClose={() => setIsSonicStudioOpen(false)}
-            history={assetHistory.filter(a => a.type === 'audio')}
-            onGenerate={(src, prompt) => handleAssetGenerated('audio', src, prompt)}
-          />
           <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
 
-          <SidebarDock 
+          <SidebarDock
               onAddNode={addNode}
               onUndo={undo}
               isChatOpen={isChatOpen}
               onToggleChat={() => setIsChatOpen(!isChatOpen)}
               isMultiFrameOpen={isMultiFrameOpen}
               onToggleMultiFrame={() => setIsMultiFrameOpen(!isMultiFrameOpen)}
-              isSonicStudioOpen={isSonicStudioOpen}
-              onToggleSonicStudio={() => setIsSonicStudioOpen(!isSonicStudioOpen)}
               assetHistory={assetHistory}
               onHistoryItemClick={(item) => { const type = item.type.includes('image') ? NodeType.IMAGE_GENERATOR : NodeType.VIDEO_GENERATOR; const data = item.type === 'image' ? { image: item.src } : { videoUri: item.src }; addNode(type, undefined, undefined, data); }}
               onDeleteAsset={(id) => setAssetHistory(prev => prev.filter(a => a.id !== id))}
@@ -1678,7 +1929,12 @@ export default function StudioTab() {
               onSaveWorkflow={saveCurrentAsWorkflow}
               onDeleteWorkflow={deleteWorkflow}
               onRenameWorkflow={renameWorkflow}
-              onOpenSettings={() => setIsSettingsOpen(true)}
+              canvases={canvases}
+              currentCanvasId={currentCanvasId}
+              onNewCanvas={createNewCanvas}
+              onSelectCanvas={selectCanvas}
+              onDeleteCanvas={deleteCanvas}
+              onRenameCanvas={renameCanvas}
           />
 
           <AssistantPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />

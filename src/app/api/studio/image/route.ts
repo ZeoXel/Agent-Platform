@@ -93,8 +93,16 @@ export async function POST(request: NextRequest) {
 
     } catch (error: any) {
         console.error('[Studio Image API] Error:', error);
+        // 提供更详细的错误信息
+        const errorMessage = error.cause?.code === 'ENOTFOUND'
+            ? `无法连接到API服务器: ${error.cause?.hostname}`
+            : error.cause?.code === 'ECONNREFUSED'
+            ? `API服务器拒绝连接`
+            : error.cause?.code
+            ? `网络错误: ${error.cause.code}`
+            : error.message || 'Internal server error';
         return NextResponse.json(
-            { error: error.message || 'Internal server error' },
+            { error: errorMessage, details: error.cause?.code },
             { status: 500 }
         );
     }

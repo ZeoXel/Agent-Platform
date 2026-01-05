@@ -1,7 +1,10 @@
 /**
- * Suno V2 音乐生成 API - 灵感模式
+ * Suno 音乐生成 API
  *
- * POST /api/audio/suno - 生成音乐 (使用 gpt_description_prompt)
+ * POST /api/audio/suno - 生成音乐
+ *   - mode: 'inspiration' | 'custom'
+ *   - 灵感模式: gpt_description_prompt
+ *   - 自定义模式: title, tags, prompt, mv 等
  * GET /api/audio/suno?ids=xxx,yyy - 查询状态
  */
 
@@ -14,16 +17,12 @@ const getApiConfig = () => {
 };
 
 /**
- * POST - 生成音乐（灵感模式）
+ * POST - 生成音乐
  */
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { prompt, make_instrumental } = body;
-
-        if (!prompt) {
-            return NextResponse.json({ code: -1, message: 'prompt is required' }, { status: 400 });
-        }
+        const { mode = 'inspiration' } = body;
 
         const { baseUrl, apiKey } = getApiConfig();
 
@@ -31,19 +30,50 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ code: -1, message: 'API Key 未配置' }, { status: 500 });
         }
 
-        // V2 灵感模式
-        const requestBody: Record<string, unknown> = {
-            gpt_description_prompt: prompt,
-        };
+        let requestBody: Record<string, unknown>;
 
-        // 纯音乐模式
-        if (make_instrumental) {
-            requestBody.make_instrumental = true;
-            requestBody.mv = 'chirp-v3-5';
-            requestBody.prompt = '';
+        if (mode === 'custom') {
+            // 自定义创作模式
+            const { title, tags, negative_tags, prompt, mv, make_instrumental, generation_type } = body;
+
+            if (!prompt && !tags) {
+                return NextResponse.json({ code: -1, message: '请提供歌词或风格标签' }, { status: 400 });
+            }
+
+            requestBody = {
+                title: title || '',
+                tags: tags || '',
+                negative_tags: negative_tags || '',
+                prompt: prompt || '',
+                mv: mv || 'chirp-v4',
+                generation_type: generation_type || 'TEXT',
+            };
+
+            // 纯音乐模式
+            if (make_instrumental) {
+                requestBody.make_instrumental = true;
+            }
+        } else {
+            // 灵感模式 (V2)
+            const { prompt, make_instrumental } = body;
+
+            if (!prompt) {
+                return NextResponse.json({ code: -1, message: 'prompt is required' }, { status: 400 });
+            }
+
+            requestBody = {
+                gpt_description_prompt: prompt,
+            };
+
+            // 纯音乐模式
+            if (make_instrumental) {
+                requestBody.make_instrumental = true;
+                requestBody.mv = 'chirp-v3-5';
+                requestBody.prompt = '';
+            }
         }
 
-        console.log('[Suno V2] Request:', JSON.stringify(requestBody));
+        console.log('[Suno] Request:', JSON.stringify(requestBody));
 
         const response = await fetch(`${baseUrl}/suno/generate`, {
             method: 'POST',
@@ -57,7 +87,7 @@ export async function POST(request: NextRequest) {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('[Suno V2 Error]', response.status, errorText);
+            console.error('[Suno Error]', response.status, errorText);
             return NextResponse.json(
                 { code: -1, message: `Suno API error: ${response.status} - ${errorText}` },
                 { status: response.status }
@@ -65,7 +95,7 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await response.json();
-        console.log('[Suno V2] Response:', JSON.stringify(result).slice(0, 500));
+        console.log('[Suno] Response:', JSON.stringify(result).slice(0, 500));
 
         // 提取 clips IDs
         let songIds: string[] = [];
@@ -79,7 +109,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (songIds.length === 0) {
-            console.error('[Suno V2] No song IDs found');
+            console.error('[Suno] No song IDs found');
             return NextResponse.json({ code: -1, message: '未获取到歌曲 ID' }, { status: 500 });
         }
 
@@ -92,7 +122,7 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (error: any) {
-        console.error('[Suno V2 Error]', error);
+        console.error('[Suno Error]', error);
         return NextResponse.json(
             { code: -1, message: error.message || '生成失败' },
             { status: 500 }

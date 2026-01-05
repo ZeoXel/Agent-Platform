@@ -25,6 +25,7 @@ export type AudioGenerationMode = 'music' | 'voice';
 export interface MusicGenerationConfig {
   title?: string;               // 歌曲标题
   tags?: string;                // 风格标签 "pop, electronic"
+  negativeTags?: string;        // 排除风格 "sad, slow"
   instrumental?: boolean;       // 纯音乐（无人声）
   mv?: string;                  // Suno 模型版本
   taskIds?: string[];           // 异步任务 ID 列表
@@ -121,6 +122,18 @@ export interface Workflow {
   nodes: AppNode[];
   connections: Connection[];
   groups: Group[];
+}
+
+// Canvas 画布 - 用于保存和恢复工作状态
+export interface Canvas {
+  id: string;
+  title: string;
+  thumbnail?: string;
+  nodes: AppNode[];
+  connections: Connection[];
+  groups: Group[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 // New Smart Sequence Types
