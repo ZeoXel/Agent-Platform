@@ -1,9 +1,10 @@
 "use client";
 
 // ... existing imports
-import { AppNode, NodeStatus, NodeType } from '../types';
+import { AppNode, NodeStatus, NodeType, AudioGenerationMode } from '../types';
 import { RefreshCw, Play, Image as ImageIcon, Video as VideoIcon, Type, AlertCircle, CheckCircle, Plus, Maximize2, Download, MoreHorizontal, Wand2, Scaling, FileSearch, Edit, Loader2, Layers, Trash2, X, Upload, Scissors, Film, MousePointerClick, Crop as CropIcon, ChevronDown, ChevronUp, GripHorizontal, Link, Copy, Monitor, Music, Pause, Volume2, Mic2 } from 'lucide-react';
 import { VideoModeSelector, SceneDirectorOverlay } from './VideoNodeModules';
+import { AudioNodePanel } from './AudioNodePanel';
 import React, { memo, useRef, useState, useEffect, useCallback } from 'react';
 
 // ... (keep constants and helper functions: arePropsEqual, safePlay, safePause, InputThumbnails, AudioVisualizer) ...
@@ -637,19 +638,72 @@ const NodeComponent: React.FC<NodeProps> = ({
             )
         }
         if (node.type === NodeType.AUDIO_GENERATOR) {
+            const audioMode = node.data.audioMode || 'music';
+            const isMusic = audioMode === 'music';
+            const coverImage = node.data.musicConfig?.coverImage;
+
             return (
-                <div className="w-full h-full p-6 flex flex-col justify-center items-center relative overflow-hidden group/audio">
-                    <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-purple-900/10 z-0"></div>
+                <div className="w-full h-full p-4 flex flex-col justify-center items-center relative overflow-hidden group/audio">
+                    {/* 背景渐变 - 根据模式变色 */}
+                    <div className={`absolute inset-0 z-0 ${isMusic ? 'bg-gradient-to-br from-pink-500/10 to-purple-900/10' : 'bg-gradient-to-br from-cyan-500/10 to-blue-900/10'}`}></div>
+
+                    {/* 封面图（音乐模式且有封面时显示） */}
+                    {isMusic && coverImage && (
+                        <div className="absolute inset-0 z-0">
+                            <img src={coverImage} className="w-full h-full object-cover opacity-30 blur-sm" alt="" />
+                        </div>
+                    )}
+
+                    {/* 模式指示器 */}
+                    <div className={`absolute top-3 left-3 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold ${isMusic ? 'bg-pink-500/20 text-pink-600' : 'bg-blue-500/20 text-blue-600'}`}>
+                        {isMusic ? <Music size={10} /> : <Mic2 size={10} />}
+                        <span>{isMusic ? '音乐' : '语音'}</span>
+                    </div>
+
                     {node.data.audioUri ? (
-                        <div className="flex flex-col items-center gap-4 w-full z-10">
+                        <div className="flex flex-col items-center gap-3 w-full z-10">
                             <audio ref={mediaRef as any} src={node.data.audioUri} onEnded={() => setIsPlayingAudio(false)} onPlay={() => setIsPlayingAudio(true)} onPause={() => setIsPlayingAudio(false)} className="hidden" />
+
+                            {/* 歌曲标题（音乐模式） */}
+                            {isMusic && node.data.musicConfig?.title && (
+                                <div className="text-xs font-bold text-slate-700 text-center truncate max-w-full px-4">
+                                    {node.data.musicConfig.title}
+                                </div>
+                            )}
+
+                            {/* 音频可视化器 */}
                             <div className="w-full px-4"><AudioVisualizer isPlaying={isPlayingAudio} /></div>
-                            <div className="flex items-center gap-4"><button onClick={toggleAudio} className="w-12 h-12 rounded-full bg-blue-500/20 hover:bg-blue-500/40 border border-blue-500/50 flex items-center justify-center transition-all hover:scale-105">{isPlayingAudio ? <Pause size={20} className="text-slate-900" /> : <Play size={20} className="text-slate-900 ml-1" />}</button></div>
+
+                            {/* 播放控制 */}
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={toggleAudio}
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110 ${isMusic ? 'bg-pink-500/20 hover:bg-pink-500/40 border border-pink-500/50' : 'bg-blue-500/20 hover:bg-blue-500/40 border border-blue-500/50'}`}
+                                >
+                                    {isPlayingAudio ? <Pause size={18} className="text-slate-900" /> : <Play size={18} className="text-slate-900 ml-0.5" />}
+                                </button>
+                            </div>
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center gap-3 text-slate-600 z-10 select-none">{isWorking ? <Loader2 size={32} className="animate-spin text-pink-500" /> : <Mic2 size={32} className="text-slate-500" />}<span className="text-[10px] font-bold uppercase tracking-widest">{isWorking ? '生成中...' : '准备生成'}</span></div>
+                        <div className="flex flex-col items-center gap-2 z-10 select-none">
+                            {isWorking ? (
+                                <Loader2 size={28} className={`animate-spin ${isMusic ? 'text-pink-500' : 'text-blue-500'}`} />
+                            ) : (
+                                <>
+                                    {isMusic ? <Music size={28} className="text-slate-400" /> : <Mic2 size={28} className="text-slate-400" />}
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">准备生成</span>
+                                </>
+                            )}
+                        </div>
                     )}
-                    {node.status === NodeStatus.ERROR && <div className="absolute inset-0 bg-white/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20"><AlertCircle className="text-red-500 mb-2" /><span className="text-xs text-red-200">{node.data.error}</span></div>}
+
+                    {/* 错误显示 */}
+                    {node.status === NodeStatus.ERROR && (
+                        <div className="absolute inset-0 bg-white/90 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center z-20">
+                            <AlertCircle className="text-red-500 mb-2" size={24} />
+                            <span className="text-[10px] text-red-500 leading-relaxed">{node.data.error}</span>
+                        </div>
+                    )}
                 </div>
             )
         }
@@ -726,6 +780,27 @@ const NodeComponent: React.FC<NodeProps> = ({
         if (node.type === NodeType.PROMPT_INPUT) return null;
 
         const isOpen = (isHovered || isInputFocused);
+
+        // 音频节点使用专用面板
+        if (node.type === NodeType.AUDIO_GENERATOR) {
+            return (
+                <AudioNodePanel
+                    node={node}
+                    isOpen={isOpen}
+                    isWorking={isWorking}
+                    localPrompt={localPrompt}
+                    setLocalPrompt={setLocalPrompt}
+                    inputHeight={inputHeight}
+                    onUpdate={onUpdate}
+                    onAction={handleActionClick}
+                    onInputFocus={() => setIsInputFocused(true)}
+                    onInputBlur={() => { setIsInputFocused(false); commitPrompt(); }}
+                    onInputResizeStart={handleInputResizeStart}
+                    onCmdEnter={handleCmdEnter}
+                />
+            );
+        }
+
         let models: { l: string, v: string, group?: string }[] = [];
         if (node.type === NodeType.VIDEO_GENERATOR || node.type === NodeType.VIDEO_FACTORY) {
             // 视频生成模型 - Veo 3.1 系列
@@ -736,8 +811,6 @@ const NodeComponent: React.FC<NodeProps> = ({
             ];
         } else if (node.type === NodeType.VIDEO_ANALYZER) {
             models = [{ l: 'Gemini 2.5 Flash', v: 'gemini-2.5-flash' }];
-        } else if (node.type === NodeType.AUDIO_GENERATOR) {
-            models = [{ l: 'Voice Factory', v: 'gemini-2.5-flash-preview-tts' }];
         } else {
             // 图像生成模型 (根据接入文档)
             models = [
@@ -761,7 +834,7 @@ const NodeComponent: React.FC<NodeProps> = ({
                 {/* Glass Panel: Set strict Z-Index to higher layer to overlap thumbnails */}
                 <div className={`w-full rounded-[20px] p-1 flex flex-col gap-1 ${GLASS_PANEL} relative z-[100]`} onMouseDown={e => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
                     <div className="relative group/input bg-white rounded-[16px]">
-                        <textarea className="w-full bg-transparent text-xs text-slate-700 placeholder-slate-500/60 p-3 focus:outline-none resize-none custom-scrollbar font-medium leading-relaxed" style={{ height: `${Math.min(inputHeight, 200)}px` }} placeholder={node.type === NodeType.AUDIO_GENERATOR ? "描述您想生成的音乐或音效..." : "描述您的修改或生成需求..."} value={localPrompt} onChange={(e) => setLocalPrompt(e.target.value)} onBlur={() => { setIsInputFocused(false); commitPrompt(); }} onKeyDown={handleCmdEnter} onFocus={() => setIsInputFocused(true)} onMouseDown={e => e.stopPropagation()} readOnly={isWorking} />
+                        <textarea className="w-full bg-transparent text-xs text-slate-700 placeholder-slate-500/60 p-3 focus:outline-none resize-none custom-scrollbar font-medium leading-relaxed" style={{ height: `${Math.min(inputHeight, 200)}px` }} placeholder="描述您的修改或生成需求..." value={localPrompt} onChange={(e) => setLocalPrompt(e.target.value)} onBlur={() => { setIsInputFocused(false); commitPrompt(); }} onKeyDown={handleCmdEnter} onFocus={() => setIsInputFocused(true)} onMouseDown={e => e.stopPropagation()} readOnly={isWorking} />
                         <div className="absolute bottom-0 left-0 w-full h-3 cursor-row-resize flex items-center justify-center opacity-0 group-hover/input:opacity-100 transition-opacity" onMouseDown={handleInputResizeStart}><div className="w-8 h-1 rounded-full bg-slate-100 group-hover/input:bg-slate-200" /></div>
                     </div>
                     <div className="flex items-center justify-between px-2 pb-1 pt-1 relative z-20">
@@ -770,7 +843,7 @@ const NodeComponent: React.FC<NodeProps> = ({
                                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-[10px] font-bold text-slate-600 hover:text-blue-400"><span>{currentModelLabel}</span><ChevronDown size={10} /></div>
                                 <div className="absolute bottom-full left-0 pb-2 w-40 opacity-0 translate-y-2 pointer-events-none group-hover/model:opacity-100 group-hover/model:translate-y-0 group-hover/model:pointer-events-auto transition-all duration-200 z-[200]"><div className="bg-white border border-slate-300 rounded-xl shadow-xl overflow-hidden">{models.map(m => (<div key={m.v} onClick={() => onUpdate(node.id, { model: m.v })} className={`px-3 py-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 ${node.data.model === m.v ? 'text-blue-400 bg-slate-50' : 'text-slate-600'}`}>{m.l}</div>))}</div></div>
                             </div>
-                            {node.type !== NodeType.VIDEO_ANALYZER && node.type !== NodeType.AUDIO_GENERATOR && (<div className="relative group/ratio"><div className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-[10px] font-bold text-slate-600 hover:text-blue-400"><Scaling size={12} /><span>{node.data.aspectRatio || '16:9'}</span></div><div className="absolute bottom-full left-0 pb-2 w-20 opacity-0 translate-y-2 pointer-events-none group-hover/ratio:opacity-100 group-hover/ratio:translate-y-0 group-hover/ratio:pointer-events-auto transition-all duration-200 z-[200]"><div className="bg-white border border-slate-300 rounded-xl shadow-xl overflow-hidden">{(node.type.includes('VIDEO') ? VIDEO_ASPECT_RATIOS : IMAGE_ASPECT_RATIOS).map(r => (<div key={r} onClick={() => handleAspectRatioSelect(r)} className={`px-3 py-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 ${node.data.aspectRatio === r ? 'text-blue-400 bg-slate-50' : 'text-slate-600'}`}>{r}</div>))}</div></div></div>)}
+                            {node.type !== NodeType.VIDEO_ANALYZER && (<div className="relative group/ratio"><div className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-[10px] font-bold text-slate-600 hover:text-blue-400"><Scaling size={12} /><span>{node.data.aspectRatio || '16:9'}</span></div><div className="absolute bottom-full left-0 pb-2 w-20 opacity-0 translate-y-2 pointer-events-none group-hover/ratio:opacity-100 group-hover/ratio:translate-y-0 group-hover/ratio:pointer-events-auto transition-all duration-200 z-[200]"><div className="bg-white border border-slate-300 rounded-xl shadow-xl overflow-hidden">{(node.type.includes('VIDEO') ? VIDEO_ASPECT_RATIOS : IMAGE_ASPECT_RATIOS).map(r => (<div key={r} onClick={() => handleAspectRatioSelect(r)} className={`px-3 py-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 ${node.data.aspectRatio === r ? 'text-blue-400 bg-slate-50' : 'text-slate-600'}`}>{r}</div>))}</div></div></div>)}
                             {(node.type.includes('IMAGE') || node.type === NodeType.VIDEO_GENERATOR || node.type === NodeType.VIDEO_FACTORY) && (<div className="relative group/resolution"><div className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-[10px] font-bold text-slate-600 hover:text-blue-400"><Monitor size={12} /><span>{node.data.resolution || (node.type.includes('IMAGE') ? '1k' : '720p')}</span></div><div className="absolute bottom-full left-0 pb-2 w-20 opacity-0 translate-y-2 pointer-events-none group-hover/resolution:opacity-100 group-hover/resolution:translate-y-0 group-hover/resolution:pointer-events-auto transition-all duration-200 z-[200]"><div className="bg-white border border-slate-300 rounded-xl shadow-xl overflow-hidden">{(node.type.includes('IMAGE') ? IMAGE_RESOLUTIONS : VIDEO_RESOLUTIONS).map(r => (<div key={r} onClick={() => onUpdate(node.id, { resolution: r })} className={`px-3 py-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 ${node.data.resolution === r ? 'text-blue-400 bg-slate-50' : 'text-slate-600'}`}>{r}</div>))}</div></div></div>)}
                         </div>
                         <button onClick={handleActionClick} disabled={isWorking} className={`relative flex items-center gap-2 px-4 py-1.5 rounded-[12px] font-bold text-[10px] tracking-wide transition-all duration-300 ${isWorking ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-black hover:shadow-lg hover:shadow-cyan-500/20 hover:scale-105 active:scale-95'}`}>{isWorking ? <Loader2 className="animate-spin" size={12} /> : <Wand2 size={12} />}<span>{isWorking ? '生成中...' : '生成'}</span></button>

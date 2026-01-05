@@ -18,6 +18,36 @@ export enum NodeStatus {
 
 export type VideoGenerationMode = 'DEFAULT' | 'CONTINUE' | 'CUT' | 'FIRST_LAST_FRAME' | 'CHARACTER_REF';
 
+// 音频生成模式
+export type AudioGenerationMode = 'music' | 'voice';
+
+// Suno 音乐生成配置
+export interface MusicGenerationConfig {
+  title?: string;               // 歌曲标题
+  tags?: string;                // 风格标签 "pop, electronic"
+  instrumental?: boolean;       // 纯音乐（无人声）
+  mv?: string;                  // Suno 模型版本
+  taskIds?: string[];           // 异步任务 ID 列表
+  status?: 'pending' | 'processing' | 'complete' | 'error';
+  coverImage?: string;          // 封面图 URL
+}
+
+// MiniMax 语音合成配置
+export interface VoiceSynthesisConfig {
+  voiceId?: string;             // 音色 ID
+  speed?: number;               // 语速 [0.5, 2]
+  volume?: number;              // 音量 (0, 10]
+  pitch?: number;               // 语调 [-12, 12]
+  emotion?: 'happy' | 'sad' | 'angry' | 'fearful' | 'disgusted' | 'surprised' | 'calm' | 'fluent';
+  // 声音效果器
+  voiceModify?: {
+    pitch?: number;             // 音高 [-100, 100]
+    intensity?: number;         // 强度 [-100, 100]
+    timbre?: number;            // 音色 [-100, 100]
+    soundEffect?: 'spacious_echo' | 'auditorium_echo' | 'lofi_telephone' | 'robotic' | '';
+  };
+}
+
 export interface AppNode {
   id: string;
   type: NodeType;
@@ -39,9 +69,15 @@ export interface AppNode {
     videoUris?: string[]; // Array of URLs (for multiple video generations)
     videoMetadata?: any; // Stores the raw Video object from Gemini API for extension
     audioUri?: string; // Base64 or Blob URL for Audio Node
+    audioUris?: string[]; // 多个音频（Suno 会生成两首）
     analysis?: string; // Video analysis result
     error?: string;
     progress?: string;
+
+    // 音频节点扩展配置
+    audioMode?: AudioGenerationMode;    // 'music' | 'voice'
+    musicConfig?: MusicGenerationConfig; // Suno 音乐配置
+    voiceConfig?: VoiceSynthesisConfig;  // MiniMax 语音配置
     aspectRatio?: string; // e.g., '16:9', '4:3'
     resolution?: string; // e.g., '1080p', '4k'
     duration?: number; // Duration in seconds (for Audio/Video)

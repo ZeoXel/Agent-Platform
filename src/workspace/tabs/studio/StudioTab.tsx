@@ -13,6 +13,8 @@ import { SettingsModal } from './components/SettingsModal';
 import { AppNode, NodeType, NodeStatus, Connection, ContextMenuState, Group, Workflow, SmartSequenceItem } from './types';
 import { generateImageFromText, generateVideo, analyzeVideo, editImageWithText, planStoryboard, orchestrateVideoPrompt, compileMultiFramePrompt, urlToBase64, extractLastFrame, generateAudio } from './services/geminiService';
 import { getGenerationStrategy } from './services/videoStrategies';
+import { createMusic, SunoSongInfo } from './services/sunoService';
+import { synthesizeSpeech, MinimaxGenerateParams } from './services/minimaxService';
 import { saveToStorage, loadFromStorage } from './services/storage';
 import { 
     Plus, Copy, Trash2, Type, Image as ImageIcon, Video as VideoIcon, 
@@ -457,13 +459,21 @@ export default function StudioTab() {
 
       try { saveHistory(); } catch (e) { }
 
+      // 确定音频节点的默认模式和模型
+      const defaultAudioMode = initialData?.audioMode || 'music';
+      const defaultAudioModel = defaultAudioMode === 'music' ? 'suno-v4' : 'speech-2.6-hd';
+
       const defaults: any = {
           model: type === NodeType.VIDEO_GENERATOR ? 'veo3.1' :
                  type === NodeType.VIDEO_ANALYZER ? 'gemini-2.5-flash' :
-                 type === NodeType.AUDIO_GENERATOR ? 'gemini-2.5-flash-preview-tts' :
+                 type === NodeType.AUDIO_GENERATOR ? defaultAudioModel :
                  type.includes('IMAGE') ? 'nano-banana' :
                  'gemini-2.5-flash',
           generationMode: type === NodeType.VIDEO_GENERATOR ? 'DEFAULT' : undefined,
+          // 音频节点默认配置
+          audioMode: type === NodeType.AUDIO_GENERATOR ? defaultAudioMode : undefined,
+          musicConfig: type === NodeType.AUDIO_GENERATOR ? { mv: 'v3.5', tags: 'pop, catchy' } : undefined,
+          voiceConfig: type === NodeType.AUDIO_GENERATOR ? { voiceId: 'female-shaonv', speed: 1, emotion: 'calm' } : undefined,
           ...initialData
       };
       
@@ -1120,8 +1130,79 @@ export default function StudioTab() {
               }
 
           } else if (node.type === NodeType.AUDIO_GENERATOR) {
-              const audioUri = await generateAudio(prompt);
-              handleNodeUpdate(id, { audioUri: audioUri });
+              const audioMode = node.data.audioMode || 'music';
+
+              if (audioMode === 'music') {
+                  // Suno V2 音乐生成（灵感模式）
+                  const musicConfig = node.data.musicConfig || {};
+                  const songs = await createMusic(
+                      {
+                          prompt,
+                          make_instrumental: musicConfig.instrumental || false,
+                      },
+                      (progressText, songData) => {
+                          // 更新封面图（如果有）
+                          if (songData?.[0]?.image_url) {
+                              handleNodeUpdate(id, {
+                                  musicConfig: {
+                                      ...node.data.musicConfig,
+                                      coverImage: songData[0].image_url
+                                  }
+                              });
+                          }
+                      }
+                  );
+
+                  // 获取第一首歌曲的音频 URL
+                  const mainSong = songs[0];
+                  if (!mainSong?.audio_url) {
+                      throw new Error('未获取到音频文件');
+                  }
+
+                  // 保存结果
+                  handleNodeUpdate(id, {
+                      audioUri: mainSong.audio_url,
+                      audioUris: songs.map(s => s.audio_url).filter(Boolean) as string[],
+                      duration: mainSong.duration,
+                      musicConfig: {
+                          ...node.data.musicConfig,
+                          title: mainSong.title,
+                          coverImage: mainSong.image_url,
+                          status: 'complete',
+                      },
+                  });
+
+              } else {
+                  // MiniMax 语音合成
+                  const voiceConfig = node.data.voiceConfig || {};
+                  const params: MinimaxGenerateParams = {
+                      model: (node.data.model as any) || 'speech-2.6-hd',
+                      text: prompt,
+                      voice_setting: {
+                          voice_id: voiceConfig.voiceId || 'female-shaonv',
+                          speed: voiceConfig.speed || 1.0,
+                          vol: voiceConfig.volume || 1.0,
+                          pitch: voiceConfig.pitch || 0,
+                          emotion: voiceConfig.emotion,
+                      },
+                  };
+
+                  // 添加声音效果器（如果有）
+                  if (voiceConfig.voiceModify) {
+                      params.voice_modify = {
+                          pitch: voiceConfig.voiceModify.pitch,
+                          intensity: voiceConfig.voiceModify.intensity,
+                          timbre: voiceConfig.voiceModify.timbre,
+                          sound_effects: voiceConfig.voiceModify.soundEffect as any,
+                      };
+                  }
+
+                  const audioUri = await synthesizeSpeech(params, (progressText) => {
+                      handleNodeUpdate(id, { progress: progressText });
+                  });
+
+                  handleNodeUpdate(id, { audioUri });
+              }
 
           } else if (node.type === NodeType.VIDEO_ANALYZER) {
              const vid = node.data.videoUri || inputs.find(n => n?.data.videoUri)?.data.videoUri;
