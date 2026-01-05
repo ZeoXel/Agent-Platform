@@ -3,6 +3,7 @@ export enum NodeType {
   PROMPT_INPUT = 'PROMPT_INPUT',
   IMAGE_GENERATOR = 'IMAGE_GENERATOR',
   VIDEO_GENERATOR = 'VIDEO_GENERATOR',
+  VIDEO_FACTORY = 'VIDEO_FACTORY', // 视频工厂：展示和编辑视频结果
   VIDEO_ANALYZER = 'VIDEO_ANALYZER',
   IMAGE_EDITOR = 'IMAGE_EDITOR',
   AUDIO_GENERATOR = 'AUDIO_GENERATOR',
@@ -27,7 +28,8 @@ export interface AppNode {
   title: string;
   status: NodeStatus;
   data: {
-    prompt?: string;
+    prompt?: string; // 生成/优化后的提示词（用于下游节点）
+    userInput?: string; // 用户的简短想法（用于生成提示词的输入）
     model?: string; // Selected AI model
     image?: string; // Base64 (The currently displayed main image)
     images?: string[]; // Array of Base64 strings (for multiple generations)

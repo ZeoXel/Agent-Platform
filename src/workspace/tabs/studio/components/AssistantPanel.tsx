@@ -1,8 +1,38 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from 'react';
-import { X, Eraser, Copy, CornerDownLeft, Loader2, Sparkles, Brain, PenLine, Wand2 } from 'lucide-react';
-import { sendChatMessage } from '../services/geminiService';
+import { X, Eraser, Copy, CornerDownLeft, Loader2, Sparkles, Brain, PenLine, Wand2, CheckCircle, AlertCircle } from 'lucide-react';
+
+// 使用统一的 Chat API
+const sendChatMessage = async (
+    history: { role: 'user' | 'model', text: string }[],
+    newMessage: string,
+    options?: { isThinkingMode?: boolean, isStoryboard?: boolean, isHelpMeWrite?: boolean }
+): Promise<string> => {
+    const messages = [
+        ...history,
+        { role: 'user' as const, text: newMessage }
+    ];
+
+    // 确定模式
+    let mode = 'default';
+    if (options?.isHelpMeWrite) mode = 'prompt_enhancer';
+    else if (options?.isStoryboard) mode = 'storyboard';
+
+    const response = await fetch('/api/studio/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, mode })
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || `API错误: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.message || '无响应';
+};
 
 interface Message {
   role: 'user' | 'model';
@@ -176,7 +206,7 @@ export const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, onClose 
     setIsLoading(true);
 
     try {
-      const history = messages.map(m => ({ role: m.role, parts: [{ text: m.text }] }));
+      const history = messages.map(m => ({ role: m.role, text: m.text }));
 
       // Pass flags to the service
       const responseText = await sendChatMessage(history, userText, {

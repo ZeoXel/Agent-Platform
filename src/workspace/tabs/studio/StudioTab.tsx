@@ -333,11 +333,43 @@ export default function StudioTab() {
       return { x: node.x, y: node.y, width: w, height: h, r: node.x + w, b: node.y + h };
   };
 
+  // 检测两个矩形是否重叠
+  const isOverlapping = (a: { x: number, y: number, width: number, height: number }, b: { x: number, y: number, width: number, height: number }, padding = 20) => {
+      return !(a.x + a.width + padding < b.x || b.x + b.width + padding < a.x || a.y + a.height + padding < b.y || b.y + b.height + padding < a.y);
+  };
+
+  // 找到不重叠的位置
+  const findNonOverlappingPosition = (startX: number, startY: number, width: number, height: number, existingNodes: AppNode[], direction: 'right' | 'down' = 'right'): { x: number, y: number } => {
+      let x = startX, y = startY;
+      const step = direction === 'right' ? 80 : 60;
+      const maxAttempts = 20;
+
+      for (let i = 0; i < maxAttempts; i++) {
+          const candidate = { x, y, width, height };
+          const hasOverlap = existingNodes.some(node => {
+              const bounds = getNodeBounds(node);
+              return isOverlapping(candidate, bounds);
+          });
+
+          if (!hasOverlap) return { x, y };
+
+          // 尝试下一个位置
+          if (direction === 'right') {
+              x += step;
+          } else {
+              y += step;
+          }
+      }
+
+      return { x, y }; // 返回最后尝试的位置
+  };
+
   const getNodeNameCN = (t: string) => {
       switch(t) {
           case NodeType.PROMPT_INPUT: return '创意描述';
           case NodeType.IMAGE_GENERATOR: return '图片生成';
           case NodeType.VIDEO_GENERATOR: return '视频生成';
+          case NodeType.VIDEO_FACTORY: return '视频工厂';
           case NodeType.AUDIO_GENERATOR: return '灵感音乐';
           case NodeType.VIDEO_ANALYZER: return '视频分析';
           case NodeType.IMAGE_EDITOR: return '图像编辑';
@@ -349,6 +381,7 @@ export default function StudioTab() {
           case NodeType.PROMPT_INPUT: return Type;
           case NodeType.IMAGE_GENERATOR: return ImageIcon;
           case NodeType.VIDEO_GENERATOR: return Film;
+          case NodeType.VIDEO_FACTORY: return VideoIcon;
           case NodeType.AUDIO_GENERATOR: return Mic2;
           case NodeType.VIDEO_ANALYZER: return ScanFace;
           case NodeType.IMAGE_EDITOR: return Brush;
@@ -424,13 +457,13 @@ export default function StudioTab() {
 
       try { saveHistory(); } catch (e) { }
 
-      const defaults: any = { 
-          model: type === NodeType.VIDEO_GENERATOR ? 'veo-3.1-fast-generate-preview' :
-                 type === NodeType.VIDEO_ANALYZER ? 'gemini-3-pro-preview' :
+      const defaults: any = {
+          model: type === NodeType.VIDEO_GENERATOR ? 'veo3.1' :
+                 type === NodeType.VIDEO_ANALYZER ? 'gemini-2.5-flash' :
                  type === NodeType.AUDIO_GENERATOR ? 'gemini-2.5-flash-preview-tts' :
-                 type.includes('IMAGE') ? 'gemini-2.5-flash-image' :
-                 'gemini-3-pro-preview',
-          generationMode: type === NodeType.VIDEO_GENERATOR ? 'DEFAULT' : undefined, // Initialize as DEFAULT (Off)
+                 type.includes('IMAGE') ? 'nano-banana' :
+                 'gemini-2.5-flash',
+          generationMode: type === NodeType.VIDEO_GENERATOR ? 'DEFAULT' : undefined,
           ...initialData
       };
       
@@ -438,27 +471,39 @@ export default function StudioTab() {
           [NodeType.PROMPT_INPUT]: '创意描述',
           [NodeType.IMAGE_GENERATOR]: '图片生成',
           [NodeType.VIDEO_GENERATOR]: '视频生成',
+          [NodeType.VIDEO_FACTORY]: '视频工厂',
           [NodeType.AUDIO_GENERATOR]: '灵感音乐',
           [NodeType.VIDEO_ANALYZER]: '视频分析',
           [NodeType.IMAGE_EDITOR]: '图像编辑'
       };
 
-      const safeX = x !== undefined ? x : (-pan.x + window.innerWidth/2)/scale - 210;
-      const safeY = y !== undefined ? y : (-pan.y + window.innerHeight/2)/scale - 180;
+      const baseX = x !== undefined ? x : (-pan.x + window.innerWidth/2)/scale - 210;
+      const baseY = y !== undefined ? y : (-pan.y + window.innerHeight/2)/scale - 180;
+      const safeBaseX = isNaN(baseX) ? 100 : baseX;
+      const safeBaseY = isNaN(baseY) ? 100 : baseY;
+
+      // 计算节点预估高度并找到不重叠的位置
+      const nodeWidth = 420;
+      const [rw, rh] = (defaults.aspectRatio || '16:9').split(':').map(Number);
+      const nodeHeight = type === NodeType.PROMPT_INPUT || type === NodeType.VIDEO_ANALYZER ? 360 :
+                         type === NodeType.AUDIO_GENERATOR ? 200 :
+                         (nodeWidth * rh / rw);
+
+      const { x: finalX, y: finalY } = findNonOverlappingPosition(safeBaseX, safeBaseY, nodeWidth, nodeHeight, nodesRef.current, 'down');
 
       const newNode: AppNode = {
         id: `n-${Date.now()}-${Math.floor(Math.random()*1000)}`,
         type,
-        x: isNaN(safeX) ? 100 : safeX,
-        y: isNaN(safeY) ? 100 : safeY,
-        width: 420, 
-        title: typeMap[type] || '未命名节点', 
-        status: NodeStatus.IDLE, 
-        data: defaults, 
+        x: finalX,
+        y: finalY,
+        width: nodeWidth,
+        title: typeMap[type] || '未命名节点',
+        status: NodeStatus.IDLE,
+        data: defaults,
         inputs: []
       };
-      
-      setNodes(prev => [...prev, newNode]); 
+
+      setNodes(prev => [...prev, newNode]);
   }, [pan, scale, saveHistory]);
 
   const handleAssetGenerated = useCallback((type: 'image' | 'video' | 'audio', src: string, title: string) => {
@@ -533,6 +578,8 @@ export default function StudioTab() {
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
       if (contextMenu) setContextMenu(null); setSelectedGroupId(null);
+      // 点击画布空白区域时，让当前聚焦的输入框失去焦点
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 
       // Space + Left Click = Canvas Drag (like middle mouse or shift+click)
       if (e.button === 0 && isSpacePressed) {
@@ -544,12 +591,13 @@ export default function StudioTab() {
 
       if (e.button === 0 && !e.shiftKey) {
           if (e.detail > 1) { e.preventDefault(); return; }
+          e.preventDefault(); // 防止拖拽选中文本
           setSelectedNodeIds([]);
           // Use canvas-relative coordinates for selection rect
           const canvasPos = getCanvasMousePos(e.clientX, e.clientY);
           setSelectionRect({ startX: canvasPos.x, startY: canvasPos.y, currentX: canvasPos.x, currentY: canvasPos.y });
       }
-      if (e.button === 1 || (e.button === 0 && e.shiftKey)) { setIsDraggingCanvas(true); setLastMousePos({ x: e.clientX, y: e.clientY }); }
+      if (e.button === 1 || (e.button === 0 && e.shiftKey)) { e.preventDefault(); setIsDraggingCanvas(true); setLastMousePos({ x: e.clientX, y: e.clientY }); }
   };
 
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
@@ -778,6 +826,42 @@ export default function StudioTab() {
               prompt = prompt ? `${combinedUpstream}\n${prompt}` : combinedUpstream;
           }
 
+          // 创意描述节点：调用 LLM 生成/优化提示词
+          if (node.type === NodeType.PROMPT_INPUT) {
+              const userInput = promptOverride || node.data.prompt || '';
+              if (!userInput.trim()) {
+                  throw new Error("请输入您的创意想法");
+              }
+
+              try {
+                  const response = await fetch('/api/studio/chat', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          messages: [{ role: 'user', text: userInput }],
+                          mode: 'prompt_generator'
+                      })
+                  });
+
+                  if (!response.ok) {
+                      const error = await response.json().catch(() => ({}));
+                      throw new Error(error.error || `API错误: ${response.status}`);
+                  }
+
+                  const result = await response.json();
+                  const generatedPrompt = result.message || '';
+
+                  // 将生成的提示词保存到节点
+                  handleNodeUpdate(id, { prompt: generatedPrompt });
+                  setNodes(p => p.map(n => n.id === id ? { ...n, status: NodeStatus.SUCCESS } : n));
+                  return; // 提前返回，不执行后续逻辑
+              } catch (e: any) {
+                  handleNodeUpdate(id, { error: e.message });
+                  setNodes(p => p.map(n => n.id === id ? { ...n, status: NodeStatus.ERROR } : n));
+                  return;
+              }
+          }
+
           if (node.type === NodeType.IMAGE_GENERATOR) {
                const inputImages: string[] = [];
                // 收集上游连接节点的图片
@@ -844,37 +928,195 @@ export default function StudioTab() {
                       console.warn("Storyboard planning failed", e);
                   }
                }
-              const res = await generateImageFromText(prompt, node.data.model || 'gemini-2.5-flash-image', inputImages, { aspectRatio: node.data.aspectRatio || '16:9', resolution: node.data.resolution, count: node.data.imageCount });
-              handleNodeUpdate(id, { image: res[0], images: res });
+              // 有参考图时：预创建新节点显示加载态
+              const hasReferenceImage = !!node.data.image;
+              let newNodeId: string | null = null;
+
+              if (hasReferenceImage) {
+                  newNodeId = `n-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                  const nodeWidth = node.width || 420;
+                  // 根据 aspectRatio 计算正确高度
+                  const [rw, rh] = (node.data.aspectRatio || '16:9').split(':').map(Number);
+                  const nodeHeight = node.height || (nodeWidth * rh / rw);
+                  // 找到不重叠的位置（优先右侧）
+                  const startX = node.x + nodeWidth + 80;
+                  const { x: newX, y: newY } = findNonOverlappingPosition(startX, node.y, nodeWidth, nodeHeight, nodesRef.current, 'right');
+                  const newNode: AppNode = {
+                      id: newNodeId,
+                      type: NodeType.IMAGE_GENERATOR,
+                      x: newX,
+                      y: newY,
+                      width: nodeWidth,
+                      height: nodeHeight,
+                      title: '编辑结果',
+                      status: NodeStatus.WORKING,
+                      data: {
+                          ...node.data,
+                          prompt: prompt,
+                          image: undefined,
+                          images: undefined,
+                      },
+                      inputs: [id],
+                  };
+                  setNodes(prev => [...prev, newNode]);
+                  setConnections(prev => [...prev, { from: id, to: newNodeId! }]);
+                  // 原节点状态设为成功
+                  setNodes(p => p.map(n => n.id === id ? { ...n, status: NodeStatus.SUCCESS } : n));
+              }
+
+              try {
+                  const res = await generateImageFromText(prompt, node.data.model || 'nano-banana', inputImages, { aspectRatio: node.data.aspectRatio || '16:9', resolution: node.data.resolution, count: node.data.imageCount });
+
+                  if (hasReferenceImage && newNodeId) {
+                      // 更新新节点为成功并填入结果
+                      handleNodeUpdate(newNodeId, { image: res[0], images: res });
+                      setNodes(p => p.map(n => n.id === newNodeId ? { ...n, status: NodeStatus.SUCCESS } : n));
+                  } else {
+                      // 纯文生图：结果在原节点显示
+                      handleNodeUpdate(id, { image: res[0], images: res });
+                  }
+              } catch (imgErr: any) {
+                  if (hasReferenceImage && newNodeId) {
+                      // 新节点显示错误
+                      handleNodeUpdate(newNodeId, { error: imgErr.message });
+                      setNodes(p => p.map(n => n.id === newNodeId ? { ...n, status: NodeStatus.ERROR } : n));
+                  } else {
+                      throw imgErr; // 抛给外层 catch 处理
+                  }
+              }
 
           } else if (node.type === NodeType.VIDEO_GENERATOR) {
-              
-              const strategy = await getGenerationStrategy(node, inputs, prompt);
-              
-              const res = await generateVideo(
-                  strategy.finalPrompt,
-                  node.data.model || 'veo-2.0-generate-001',
-                  {
-                      aspectRatio: node.data.aspectRatio || '16:9',
-                      count: node.data.videoCount || 1,
-                      generationMode: strategy.generationMode,
-                      resolution: node.data.resolution
+              // 预创建 VIDEO_FACTORY 节点显示加载态
+              const factoryNodeId = `n-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+              const nodeWidth = node.width || 420;
+              const [rw, rh] = (node.data.aspectRatio || '16:9').split(':').map(Number);
+              const nodeHeight = node.height || (nodeWidth * rh / rw);
+              const startX = node.x + nodeWidth + 80;
+              const { x: newX, y: newY } = findNonOverlappingPosition(startX, node.y, nodeWidth, nodeHeight, nodesRef.current, 'right');
+
+              const factoryNode: AppNode = {
+                  id: factoryNodeId,
+                  type: NodeType.VIDEO_FACTORY,
+                  x: newX,
+                  y: newY,
+                  width: nodeWidth,
+                  height: nodeHeight,
+                  title: '视频工厂',
+                  status: NodeStatus.WORKING,
+                  data: {
+                      ...node.data,
+                      prompt: prompt,
+                      videoUri: undefined,
+                      videoUris: undefined,
+                      image: node.data.image, // 保留输入图片作为封面
                   },
-                  strategy.inputImageForGeneration,
-                  strategy.videoInput,
-                  strategy.referenceImages
-              );
-              
-              if (res.isFallbackImage) {
-                   handleNodeUpdate(id, { 
-                       image: res.uri, 
-                       videoUri: undefined, 
-                       videoMetadata: undefined,
-                       error: "Region restricted: Generated preview image instead.", 
-                       status: NodeStatus.SUCCESS 
-                   });
-              } else {
-                   handleNodeUpdate(id, { videoUri: res.uri, videoMetadata: res.videoMetadata, videoUris: res.uris });
+                  inputs: [id],
+              };
+              setNodes(prev => [...prev, factoryNode]);
+              setConnections(prev => [...prev, { from: id, to: factoryNodeId }]);
+              // 原节点状态设为成功
+              setNodes(p => p.map(n => n.id === id ? { ...n, status: NodeStatus.SUCCESS } : n));
+
+              try {
+                  const strategy = await getGenerationStrategy(node, inputs, prompt);
+
+                  const res = await generateVideo(
+                      strategy.finalPrompt,
+                      node.data.model || 'veo3.1',
+                      {
+                          aspectRatio: node.data.aspectRatio || '16:9',
+                          count: node.data.videoCount || 1,
+                          generationMode: strategy.generationMode,
+                          resolution: node.data.resolution
+                      },
+                      strategy.inputImageForGeneration,
+                      strategy.videoInput,
+                      strategy.referenceImages
+                  );
+
+                  if (res.isFallbackImage) {
+                      handleNodeUpdate(factoryNodeId, {
+                          image: res.uri,
+                          videoUri: undefined,
+                          error: "Region restricted: Generated preview image instead."
+                      });
+                  } else {
+                      handleNodeUpdate(factoryNodeId, { videoUri: res.uri, videoMetadata: res.videoMetadata, videoUris: res.uris });
+                  }
+                  setNodes(p => p.map(n => n.id === factoryNodeId ? { ...n, status: NodeStatus.SUCCESS } : n));
+              } catch (videoErr: any) {
+                  handleNodeUpdate(factoryNodeId, { error: videoErr.message });
+                  setNodes(p => p.map(n => n.id === factoryNodeId ? { ...n, status: NodeStatus.ERROR } : n));
+              }
+
+          } else if (node.type === NodeType.VIDEO_FACTORY) {
+              // VIDEO_FACTORY 节点：基于现有视频继续生成/编辑
+              const newFactoryNodeId = `n-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+              const nodeWidth = node.width || 420;
+              const [rw, rh] = (node.data.aspectRatio || '16:9').split(':').map(Number);
+              const nodeHeight = node.height || (nodeWidth * rh / rw);
+              const startX = node.x + nodeWidth + 80;
+              const { x: newX, y: newY } = findNonOverlappingPosition(startX, node.y, nodeWidth, nodeHeight, nodesRef.current, 'right');
+
+              const newFactoryNode: AppNode = {
+                  id: newFactoryNodeId,
+                  type: NodeType.VIDEO_FACTORY,
+                  x: newX,
+                  y: newY,
+                  width: nodeWidth,
+                  height: nodeHeight,
+                  title: '视频工厂',
+                  status: NodeStatus.WORKING,
+                  data: {
+                      ...node.data,
+                      prompt: prompt,
+                      videoUri: undefined,
+                      videoUris: undefined,
+                  },
+                  inputs: [id],
+              };
+              setNodes(prev => [...prev, newFactoryNode]);
+              setConnections(prev => [...prev, { from: id, to: newFactoryNodeId }]);
+              setNodes(p => p.map(n => n.id === id ? { ...n, status: NodeStatus.SUCCESS } : n));
+
+              try {
+                  // 使用当前视频作为输入进行继续/编辑
+                  let videoInput: string | undefined;
+                  if (node.data.videoUri) {
+                      videoInput = node.data.videoUri.startsWith('http')
+                          ? await urlToBase64(node.data.videoUri)
+                          : node.data.videoUri;
+                  }
+
+                  const strategy = await getGenerationStrategy(node, inputs, prompt);
+
+                  const res = await generateVideo(
+                      strategy.finalPrompt,
+                      node.data.model || 'veo3.1',
+                      {
+                          aspectRatio: node.data.aspectRatio || '16:9',
+                          count: node.data.videoCount || 1,
+                          generationMode: strategy.generationMode,
+                          resolution: node.data.resolution
+                      },
+                      strategy.inputImageForGeneration,
+                      videoInput || strategy.videoInput,
+                      strategy.referenceImages
+                  );
+
+                  if (res.isFallbackImage) {
+                      handleNodeUpdate(newFactoryNodeId, {
+                          image: res.uri,
+                          videoUri: undefined,
+                          error: "Region restricted: Generated preview image instead."
+                      });
+                  } else {
+                      handleNodeUpdate(newFactoryNodeId, { videoUri: res.uri, videoMetadata: res.videoMetadata, videoUris: res.uris });
+                  }
+                  setNodes(p => p.map(n => n.id === newFactoryNodeId ? { ...n, status: NodeStatus.SUCCESS } : n));
+              } catch (videoErr: any) {
+                  handleNodeUpdate(newFactoryNodeId, { error: videoErr.message });
+                  setNodes(p => p.map(n => n.id === newFactoryNodeId ? { ...n, status: NodeStatus.ERROR } : n));
               }
 
           } else if (node.type === NodeType.AUDIO_GENERATOR) {
@@ -1069,7 +1311,7 @@ export default function StudioTab() {
     <div className="w-screen h-screen overflow-hidden bg-slate-50">
       <div
           ref={canvasContainerRef}
-          className={`w-full h-full overflow-hidden text-slate-700 selection:bg-blue-200 ${isDraggingCanvas ? 'cursor-grabbing' : 'cursor-default'}`}
+          className={`w-full h-full overflow-hidden text-slate-700 selection:bg-blue-200 ${isDraggingCanvas ? 'cursor-grabbing' : 'cursor-default'} ${(isDraggingCanvas || draggingNodeId || resizingNodeId || connectionStart || selectionRect || draggingGroup) ? 'select-none' : ''}`}
           onMouseDown={handleCanvasMouseDown}
           onDoubleClick={(e) => { e.preventDefault(); if (e.detail > 1 && !selectionRect) { setContextMenu({ visible: true, x: e.clientX, y: e.clientY, id: '' }); setContextMenuTarget({ type: 'create' }); } }}
           onContextMenu={(e) => { e.preventDefault(); if(e.target === e.currentTarget) setContextMenu(null); }}
@@ -1124,11 +1366,12 @@ export default function StudioTab() {
               {groups.map(g => (
                   <div 
                       key={g.id} className={`absolute rounded-[32px] border transition-all ${(draggingGroup?.id === g.id || draggingNodeParentGroupId === g.id) ? 'duration-0' : 'duration-300'} ${selectedGroupId === g.id ? 'border-blue-500/50 bg-blue-50' : 'border-slate-300 bg-slate-50'}`} style={{ left: g.x, top: g.y, width: g.width, height: g.height }} 
-                      onMouseDown={(e) => { 
-                          e.stopPropagation(); setSelectedGroupId(g.id); 
+                      onMouseDown={(e) => {
+                          e.stopPropagation(); e.preventDefault(); // 防止拖拽选中文本
+                          setSelectedGroupId(g.id);
                           const childNodes = nodes.filter(n => { const b = getNodeBounds(n); const cx = b.x + b.width/2; const cy = b.y + b.height/2; return cx>g.x && cx<g.x+g.width && cy>g.y && cy<g.y+g.height; }).map(n=>({id:n.id, startX:n.x, startY:n.y}));
                           dragGroupRef.current = { id: g.id, startX: g.x, startY: g.y, mouseStartX: e.clientX, mouseStartY: e.clientY, childNodes };
-                          setActiveGroupNodeIds(childNodes.map(c => c.id)); setDraggingGroup({ id: g.id }); 
+                          setActiveGroupNodeIds(childNodes.map(c => c.id)); setDraggingGroup({ id: g.id });
                       }} 
                       onContextMenu={e => { e.stopPropagation(); setContextMenu({visible:true, x:e.clientX, y:e.clientY, id:g.id}); setContextMenuTarget({type:'group', id:g.id}); }}
                   >
@@ -1203,8 +1446,9 @@ export default function StudioTab() {
               {nodes.map(node => (
               <Node
                   key={node.id} node={node} onUpdate={handleNodeUpdate} onAction={handleNodeAction} onDelete={(id) => deleteNodes([id])} onExpand={setExpandedMedia} onCrop={(id, img) => { setCroppingNodeId(id); setImageToCrop(img); }}
-                  onNodeMouseDown={(e, id) => { 
-                      e.stopPropagation(); 
+                  onNodeMouseDown={(e, id) => {
+                      e.stopPropagation();
+                      e.preventDefault(); // 防止拖拽选中文本
                       if (e.shiftKey || e.metaKey || e.ctrlKey) { setSelectedNodeIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]); } else { setSelectedNodeIds([id]); }
                       const n = nodes.find(x => x.id === id);
                       if (n) {
@@ -1218,6 +1462,7 @@ export default function StudioTab() {
                   }}
                   onPortMouseDown={(e, id, type) => {
                       e.stopPropagation();
+                      e.preventDefault(); // 防止拖拽选中文本
                       // Get the actual center position of the port element
                       const portElement = e.currentTarget as HTMLElement;
                       const rect = portElement.getBoundingClientRect();
@@ -1259,8 +1504,9 @@ export default function StudioTab() {
                       setConnectionStart(null);
                   }}
                   onNodeContextMenu={(e, id) => { e.stopPropagation(); e.preventDefault(); setContextMenu({ visible: true, x: e.clientX, y: e.clientY, id }); setContextMenuTarget({ type: 'node', id }); }}
-                  onResizeMouseDown={(e, id, w, h) => { 
-                      e.stopPropagation(); const n = nodes.find(x => x.id === id);
+                  onResizeMouseDown={(e, id, w, h) => {
+                      e.stopPropagation(); e.preventDefault(); // 防止拖拽选中文本
+                      const n = nodes.find(x => x.id === id);
                       if (n) {
                           const cx = n.x + w/2; const cy = n.y + 160; 
                           const pGroup = groups.find(g => { return cx > g.x && cx < g.x + g.width && cy > g.y && cy < g.y + g.height; });
@@ -1295,7 +1541,7 @@ export default function StudioTab() {
                   {contextMenuTarget?.type === 'create' && (
                       <>
                           <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">创建新节点</div>
-                          {[NodeType.PROMPT_INPUT, NodeType.IMAGE_GENERATOR, NodeType.VIDEO_GENERATOR, NodeType.AUDIO_GENERATOR, NodeType.VIDEO_ANALYZER, NodeType.IMAGE_EDITOR].map(t => { const ItemIcon = getNodeIcon(t); return ( <button key={t} className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2.5 transition-colors" onClick={() => { addNode(t, (contextMenu.x-pan.x)/scale, (contextMenu.y-pan.y)/scale); setContextMenu(null); }}> <ItemIcon size={12} className="text-blue-600" /> {getNodeNameCN(t)} </button> ); })}
+                          {[NodeType.PROMPT_INPUT, NodeType.IMAGE_GENERATOR, NodeType.VIDEO_GENERATOR, NodeType.VIDEO_FACTORY, NodeType.AUDIO_GENERATOR, NodeType.VIDEO_ANALYZER, NodeType.IMAGE_EDITOR].map(t => { const ItemIcon = getNodeIcon(t); return ( <button key={t} className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2.5 transition-colors" onClick={() => { addNode(t, (contextMenu.x-pan.x)/scale, (contextMenu.y-pan.y)/scale); setContextMenu(null); }}> <ItemIcon size={12} className="text-blue-600" /> {getNodeNameCN(t)} </button> ); })}
                       </>
                   )}
                   {contextMenuTarget?.type === 'group' && (

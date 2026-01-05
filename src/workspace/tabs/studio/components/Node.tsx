@@ -324,7 +324,7 @@ const NodeComponent: React.FC<NodeProps> = ({
 
     React.useEffect(() => {
         if (videoBlobUrl) { URL.revokeObjectURL(videoBlobUrl); setVideoBlobUrl(null); }
-        if ((node.type === NodeType.VIDEO_GENERATOR || node.type === NodeType.VIDEO_ANALYZER) && node.data.videoUri) {
+        if ((node.type === NodeType.VIDEO_GENERATOR || node.type === NodeType.VIDEO_FACTORY || node.type === NodeType.VIDEO_ANALYZER) && node.data.videoUri) {
             if (node.data.videoUri.startsWith('data:')) { setVideoBlobUrl(node.data.videoUri); return; }
             let isActive = true; setIsLoadingVideo(true);
             // Standard fetch for local usage in analysis/display
@@ -421,8 +421,72 @@ const NodeComponent: React.FC<NodeProps> = ({
             window.open(src, '_blank');
         }
     };
-    const handleUploadVideo = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => onUpdate(node.id, { videoUri: e.target?.result as string }); reader.readAsDataURL(file); } };
-    const handleUploadImage = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => onUpdate(node.id, { image: e.target?.result as string }); reader.readAsDataURL(file); } };
+    const handleUploadVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const dataUrl = evt.target?.result as string;
+                // 检测视频尺寸并更新节点比例
+                const video = document.createElement('video');
+                video.onloadedmetadata = () => {
+                    const w = video.videoWidth;
+                    const h = video.videoHeight;
+                    const gcd = (a: number, b: number): number => b ? gcd(b, a % b) : a;
+                    const divisor = gcd(w, h);
+                    const ratioW = w / divisor;
+                    const ratioH = h / divisor;
+                    // 简化常见比例
+                    let aspectRatio = `${ratioW}:${ratioH}`;
+                    if (Math.abs(w/h - 16/9) < 0.1) aspectRatio = '16:9';
+                    else if (Math.abs(w/h - 9/16) < 0.1) aspectRatio = '9:16';
+                    else if (Math.abs(w/h - 1) < 0.1) aspectRatio = '1:1';
+                    else if (Math.abs(w/h - 4/3) < 0.1) aspectRatio = '4:3';
+                    else if (Math.abs(w/h - 3/4) < 0.1) aspectRatio = '3:4';
+
+                    const nodeWidth = node.width || DEFAULT_NODE_WIDTH;
+                    const [rw, rh] = aspectRatio.split(':').map(Number);
+                    const newHeight = (nodeWidth * rh) / rw;
+                    onUpdate(node.id, { videoUri: dataUrl, aspectRatio }, { height: newHeight });
+                };
+                video.src = dataUrl;
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    const handleUploadImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const dataUrl = evt.target?.result as string;
+                // 检测图片尺寸并更新节点比例
+                const img = new Image();
+                img.onload = () => {
+                    const w = img.width;
+                    const h = img.height;
+                    const gcd = (a: number, b: number): number => b ? gcd(b, a % b) : a;
+                    const divisor = gcd(w, h);
+                    const ratioW = w / divisor;
+                    const ratioH = h / divisor;
+                    // 简化常见比例
+                    let aspectRatio = `${ratioW}:${ratioH}`;
+                    if (Math.abs(w/h - 16/9) < 0.1) aspectRatio = '16:9';
+                    else if (Math.abs(w/h - 9/16) < 0.1) aspectRatio = '9:16';
+                    else if (Math.abs(w/h - 1) < 0.1) aspectRatio = '1:1';
+                    else if (Math.abs(w/h - 4/3) < 0.1) aspectRatio = '4:3';
+                    else if (Math.abs(w/h - 3/4) < 0.1) aspectRatio = '3:4';
+
+                    const nodeWidth = node.width || DEFAULT_NODE_WIDTH;
+                    const [rw, rh] = aspectRatio.split(':').map(Number);
+                    const newHeight = (nodeWidth * rh) / rw;
+                    onUpdate(node.id, { image: dataUrl, aspectRatio }, { height: newHeight });
+                };
+                img.src = dataUrl;
+            };
+            reader.readAsDataURL(file);
+        }
+    };
     const handleAspectRatioSelect = (newRatio: string) => {
         const [w, h] = newRatio.split(':').map(Number);
         let newSize: { width?: number, height?: number } = { height: undefined };
@@ -440,6 +504,7 @@ const NodeComponent: React.FC<NodeProps> = ({
             case NodeType.PROMPT_INPUT: return { icon: Type, color: 'text-amber-400', border: 'border-amber-500/30' };
             case NodeType.IMAGE_GENERATOR: return { icon: ImageIcon, color: 'text-blue-400', border: 'border-blue-500/30' };
             case NodeType.VIDEO_GENERATOR: return { icon: VideoIcon, color: 'text-purple-400', border: 'border-purple-500/30' };
+            case NodeType.VIDEO_FACTORY: return { icon: Film, color: 'text-violet-400', border: 'border-violet-500/30' };
             case NodeType.AUDIO_GENERATOR: return { icon: Mic2, color: 'text-pink-400', border: 'border-pink-500/30' };
             case NodeType.VIDEO_ANALYZER: return { icon: FileSearch, color: 'text-emerald-400', border: 'border-emerald-500/30' };
             case NodeType.IMAGE_EDITOR: return { icon: Edit, color: 'text-rose-400', border: 'border-rose-500/30' };
@@ -454,7 +519,7 @@ const NodeComponent: React.FC<NodeProps> = ({
         if (node.type === NodeType.AUDIO_GENERATOR) return AUDIO_NODE_HEIGHT;
         const ratio = node.data.aspectRatio || '16:9';
         const [w, h] = ratio.split(':').map(Number);
-        const extra = (node.type === NodeType.VIDEO_GENERATOR && generationMode === 'CUT') ? 36 : 0;
+        const extra = (node.type === NodeType.VIDEO_FACTORY && generationMode === 'CUT') ? 36 : 0;
         return ((node.width || DEFAULT_NODE_WIDTH) * h / w) + extra;
     };
     const nodeHeight = getNodeHeight();
@@ -466,7 +531,7 @@ const NodeComponent: React.FC<NodeProps> = ({
         return (
             <div className={`absolute -top-10 left-0 w-full flex items-center justify-between px-1 transition-all duration-300 ${showTopBar ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                 <div className="flex items-center gap-1.5 pointer-events-auto">
-                    {node.type === NodeType.VIDEO_GENERATOR && (<VideoModeSelector currentMode={generationMode} onSelect={(mode) => onUpdate(node.id, { generationMode: mode })} />)}
+                    {node.type === NodeType.VIDEO_FACTORY && (<VideoModeSelector currentMode={generationMode} onSelect={(mode) => onUpdate(node.id, { generationMode: mode })} />)}
                     {(node.data.image || node.data.videoUri || node.data.audioUri) && (
                         <div className="flex items-center gap-1">
                             <button onClick={handleDownload} className="p-1.5 bg-white/70 border border-slate-300 backdrop-blur-md rounded-md text-slate-600 hover:text-slate-900 hover:border-white/30 transition-colors" title="下载"><Download size={14} /></button>
@@ -490,11 +555,68 @@ const NodeComponent: React.FC<NodeProps> = ({
 
     const renderMediaContent = () => {
         if (node.type === NodeType.PROMPT_INPUT) {
+            // 简化的创意描述节点：单一文本输入框 + AI优化按钮
+            const hasContent = localPrompt && localPrompt.trim().length > 0;
             return (
-                <div className="w-full h-full p-6 flex flex-col group/text">
-                    <div className="flex-1 bg-white rounded-2xl border border-slate-200 p-4 relative overflow-hidden backdrop-blur-sm transition-colors group-hover/text:bg-slate-50">
-                        <textarea className="w-full h-full bg-transparent resize-none focus:outline-none text-sm text-slate-700 placeholder-slate-500 font-medium leading-relaxed custom-scrollbar selection:bg-amber-500/30" placeholder="输入您的创意构想..." value={localPrompt} onChange={(e) => setLocalPrompt(e.target.value)} onBlur={commitPrompt} onKeyDown={handleCmdEnter} onWheel={(e) => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} maxLength={1000} />
+                <div className="w-full h-full p-3 flex flex-col gap-2 group/text">
+                    {/* 统一的文本编辑区 */}
+                    <div className="flex-1 bg-white rounded-[16px] border border-slate-200 relative overflow-hidden hover:border-cyan-300/50 focus-within:border-cyan-400 transition-colors">
+                        <textarea
+                            className="w-full h-full bg-transparent resize-none focus:outline-none text-xs text-slate-700 placeholder-slate-500/60 p-3 font-medium leading-relaxed custom-scrollbar"
+                            placeholder="在此输入或编辑您的创意描述...&#10;&#10;可以直接手动编辑，也可以输入简短想法后点击下方「AI 优化」按钮让 AI 帮您扩写润色。"
+                            value={localPrompt}
+                            onChange={(e) => setLocalPrompt(e.target.value)}
+                            onBlur={(e) => { commitPrompt(); (e.target as HTMLTextAreaElement).blur(); }}
+                            onKeyDown={(e) => {
+                                handleCmdEnter(e);
+                                if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    (e.target as HTMLTextAreaElement).blur();
+                                }
+                            }}
+                            onWheel={(e) => e.stopPropagation()}
+                            onMouseDown={e => e.stopPropagation()}
+                        />
+                        {/* 右上角复制按钮 */}
+                        {hasContent && (
+                            <button
+                                className="absolute top-2 right-2 p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-700 transition-all opacity-0 group-hover/text:opacity-100"
+                                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(localPrompt); }}
+                                title="复制内容"
+                            >
+                                <Copy size={12} />
+                            </button>
+                        )}
                     </div>
+                    {/* 底部操作栏 */}
+                    <div className="flex items-center justify-between px-2 py-1">
+                        <span className="text-[10px] text-slate-500 font-bold">
+                            {localPrompt.length > 0 ? `${localPrompt.length} 字` : ''}
+                        </span>
+                        <button
+                            onClick={handleActionClick}
+                            disabled={isWorking || !hasContent}
+                            className={`flex items-center gap-2 px-4 py-1.5 rounded-[12px] font-bold text-[10px] tracking-wide transition-all duration-300 ${
+                                isWorking
+                                    ? 'bg-slate-50 text-slate-500 cursor-not-allowed'
+                                    : hasContent
+                                        ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-black hover:shadow-lg hover:shadow-cyan-500/20 hover:scale-105 active:scale-95'
+                                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            }`}
+                        >
+                            {isWorking ? <Loader2 className="animate-spin" size={12} /> : <Wand2 size={12} />}
+                            <span>{isWorking ? '优化中...' : 'AI 优化'}</span>
+                        </button>
+                    </div>
+                    {/* 加载遮罩 */}
+                    {isWorking && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-10 rounded-[24px]">
+                            <div className="flex flex-col items-center gap-2">
+                                <Loader2 className="animate-spin text-cyan-500" size={28} />
+                                <span className="text-xs font-medium text-slate-600">AI 正在优化您的描述...</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -536,7 +658,7 @@ const NodeComponent: React.FC<NodeProps> = ({
         return (
             <div className="w-full h-full relative group/media overflow-hidden bg-white" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
                 {!hasContent ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-600"><div className="w-20 h-20 rounded-[28px] bg-slate-50 border border-slate-200 flex items-center justify-center cursor-pointer hover:bg-slate-100 hover:scale-105 transition-all duration-300 shadow-inner" onClick={() => fileInputRef.current?.click()}>{isWorking ? <Loader2 className="animate-spin text-blue-500" size={32} /> : <NodeIcon size={32} className="opacity-50" />}</div><span className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-40">{isWorking ? "处理中..." : "拖拽或上传"}</span><input type="file" ref={fileInputRef} className="hidden" accept={node.type.includes('VIDEO') ? "video/*" : "image/*"} onChange={node.type.includes('VIDEO') ? handleUploadVideo : handleUploadImage} /></div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-600"><div className="w-20 h-20 rounded-[28px] bg-slate-50 border border-slate-200 flex items-center justify-center cursor-pointer hover:bg-slate-100 hover:scale-105 transition-all duration-300 shadow-inner" onClick={() => fileInputRef.current?.click()}>{isWorking ? <Loader2 className="animate-spin text-blue-500" size={32} /> : (node.type === NodeType.VIDEO_GENERATOR ? <ImageIcon size={32} className="opacity-50" /> : <NodeIcon size={32} className="opacity-50" />)}</div><span className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-40">{isWorking ? "处理中..." : "拖拽或上传"}</span><input type="file" ref={fileInputRef} className="hidden" accept={node.type === NodeType.VIDEO_FACTORY ? "video/*" : "image/*"} onChange={node.type === NodeType.VIDEO_FACTORY ? handleUploadVideo : handleUploadImage} /></div>
                 ) : (
                     <>
                         {node.data.image ?
@@ -575,7 +697,7 @@ const NodeComponent: React.FC<NodeProps> = ({
                         {generationMode === 'CUT' && !node.data.croppedFrame && hasInputs && inputAssets?.some(a => a.src) && (<div className="absolute top-4 right-4 w-24 aspect-video bg-white/90 rounded-lg border border-purple-500/30 border-dashed shadow-xl overflow-hidden z-20 hover:scale-150 transition-transform origin-top-right flex flex-col items-center justify-center group/preview opacity-0 group-hover:opacity-100 transition-opacity duration-300"><div className="absolute inset-0 bg-purple-500/10 z-10"></div>{(() => { const asset = inputAssets!.find(a => a.src); if (asset?.type === 'video') { return <SecureVideo src={asset.src} className="w-full h-full object-cover opacity-60 bg-white" muted autoPlay />; } else { return <img src={asset?.src} className="w-full h-full object-cover opacity-60 bg-white" />; } })()}<span className="absolute z-20 text-[8px] font-bold text-purple-500 bg-white/90 px-1 rounded">分镜参考</span></div>)}
                     </>
                 )}
-                {node.type === NodeType.VIDEO_GENERATOR && generationMode === 'CUT' && (videoBlobUrl || node.data.videoUri) &&
+                {node.type === NodeType.VIDEO_FACTORY && generationMode === 'CUT' && (videoBlobUrl || node.data.videoUri) &&
                     <SceneDirectorOverlay
                         visible={true}
                         videoRef={mediaRef as React.RefObject<HTMLVideoElement>}
@@ -600,9 +722,12 @@ const NodeComponent: React.FC<NodeProps> = ({
     };
 
     const renderBottomPanel = () => {
+        // 创意描述节点不需要底部弹出框（已在节点内集成 AI 优化功能）
+        if (node.type === NodeType.PROMPT_INPUT) return null;
+
         const isOpen = (isHovered || isInputFocused);
         let models: { l: string, v: string, group?: string }[] = [];
-        if (node.type === NodeType.VIDEO_GENERATOR) {
+        if (node.type === NodeType.VIDEO_GENERATOR || node.type === NodeType.VIDEO_FACTORY) {
             // 视频生成模型 - Veo 3.1 系列
             models = [
                 { l: 'Veo 3.1', v: 'veo3.1' },
@@ -625,6 +750,10 @@ const NodeComponent: React.FC<NodeProps> = ({
             ];
         }
 
+        // 获取默认模型名称（当 node.data.model 未设置时）
+        const defaultModel = models[0];
+        const currentModelLabel = models.find(m => m.v === node.data.model)?.l || defaultModel?.l || 'AI Model';
+
         return (
             <div className={`absolute top-full left-1/2 -translate-x-1/2 w-[98%] pt-2 z-50 flex flex-col items-center justify-start transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isOpen ? `opacity-100 translate-y-0 scale-100` : 'opacity-0 translate-y-[-10px] scale-95 pointer-events-none'}`}>
                 {/* InputThumbnails: Set strict Z-Index to lower layer */}
@@ -638,12 +767,11 @@ const NodeComponent: React.FC<NodeProps> = ({
                     <div className="flex items-center justify-between px-2 pb-1 pt-1 relative z-20">
                         <div className="flex items-center gap-2">
                             <div className="relative group/model">
-                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-[10px] font-bold text-slate-600 hover:text-blue-400"><span>{models.find(m => m.v === node.data.model)?.l || 'AI Model'}</span><ChevronDown size={10} /></div>
+                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-[10px] font-bold text-slate-600 hover:text-blue-400"><span>{currentModelLabel}</span><ChevronDown size={10} /></div>
                                 <div className="absolute bottom-full left-0 pb-2 w-40 opacity-0 translate-y-2 pointer-events-none group-hover/model:opacity-100 group-hover/model:translate-y-0 group-hover/model:pointer-events-auto transition-all duration-200 z-[200]"><div className="bg-white border border-slate-300 rounded-xl shadow-xl overflow-hidden">{models.map(m => (<div key={m.v} onClick={() => onUpdate(node.id, { model: m.v })} className={`px-3 py-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 ${node.data.model === m.v ? 'text-blue-400 bg-slate-50' : 'text-slate-600'}`}>{m.l}</div>))}</div></div>
                             </div>
                             {node.type !== NodeType.VIDEO_ANALYZER && node.type !== NodeType.AUDIO_GENERATOR && (<div className="relative group/ratio"><div className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-[10px] font-bold text-slate-600 hover:text-blue-400"><Scaling size={12} /><span>{node.data.aspectRatio || '16:9'}</span></div><div className="absolute bottom-full left-0 pb-2 w-20 opacity-0 translate-y-2 pointer-events-none group-hover/ratio:opacity-100 group-hover/ratio:translate-y-0 group-hover/ratio:pointer-events-auto transition-all duration-200 z-[200]"><div className="bg-white border border-slate-300 rounded-xl shadow-xl overflow-hidden">{(node.type.includes('VIDEO') ? VIDEO_ASPECT_RATIOS : IMAGE_ASPECT_RATIOS).map(r => (<div key={r} onClick={() => handleAspectRatioSelect(r)} className={`px-3 py-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 ${node.data.aspectRatio === r ? 'text-blue-400 bg-slate-50' : 'text-slate-600'}`}>{r}</div>))}</div></div></div>)}
-                            {(node.type.includes('IMAGE') || node.type === NodeType.VIDEO_GENERATOR) && (<div className="relative group/resolution"><div className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-[10px] font-bold text-slate-600 hover:text-blue-400"><Monitor size={12} /><span>{node.data.resolution || (node.type.includes('IMAGE') ? '1k' : '720p')}</span></div><div className="absolute bottom-full left-0 pb-2 w-20 opacity-0 translate-y-2 pointer-events-none group-hover/resolution:opacity-100 group-hover/resolution:translate-y-0 group-hover/resolution:pointer-events-auto transition-all duration-200 z-[200]"><div className="bg-white border border-slate-300 rounded-xl shadow-xl overflow-hidden">{(node.type.includes('IMAGE') ? IMAGE_RESOLUTIONS : VIDEO_RESOLUTIONS).map(r => (<div key={r} onClick={() => onUpdate(node.id, { resolution: r })} className={`px-3 py-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 ${node.data.resolution === r ? 'text-blue-400 bg-slate-50' : 'text-slate-600'}`}>{r}</div>))}</div></div></div>)}
-                            {(node.type.includes('IMAGE') || node.type === NodeType.VIDEO_GENERATOR) && (<div className="relative group/count"><div className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-[10px] font-bold text-slate-600 hover:text-blue-400"><Layers size={12} /><span>{node.type.includes('IMAGE') ? (node.data.imageCount || 1) : (node.data.videoCount || 1)}</span></div><div className="absolute bottom-full left-0 pb-2 w-16 opacity-0 translate-y-2 pointer-events-none group-hover/count:opacity-100 group-hover/count:translate-y-0 group-hover/count:pointer-events-auto transition-all duration-200 z-[200]"><div className="bg-white border border-slate-300 rounded-xl shadow-xl overflow-hidden">{(node.type.includes('IMAGE') ? IMAGE_COUNTS : VIDEO_COUNTS).map(c => (<div key={c} onClick={() => onUpdate(node.id, node.type.includes('IMAGE') ? { imageCount: c } : { videoCount: c })} className={`px-3 py-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 ${((node.type.includes('IMAGE') ? node.data.imageCount : node.data.videoCount) || 1) === c ? 'text-blue-400 bg-slate-50' : 'text-slate-600'}`}>{c}</div>))}</div></div></div>)}
+                            {(node.type.includes('IMAGE') || node.type === NodeType.VIDEO_GENERATOR || node.type === NodeType.VIDEO_FACTORY) && (<div className="relative group/resolution"><div className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-[10px] font-bold text-slate-600 hover:text-blue-400"><Monitor size={12} /><span>{node.data.resolution || (node.type.includes('IMAGE') ? '1k' : '720p')}</span></div><div className="absolute bottom-full left-0 pb-2 w-20 opacity-0 translate-y-2 pointer-events-none group-hover/resolution:opacity-100 group-hover/resolution:translate-y-0 group-hover/resolution:pointer-events-auto transition-all duration-200 z-[200]"><div className="bg-white border border-slate-300 rounded-xl shadow-xl overflow-hidden">{(node.type.includes('IMAGE') ? IMAGE_RESOLUTIONS : VIDEO_RESOLUTIONS).map(r => (<div key={r} onClick={() => onUpdate(node.id, { resolution: r })} className={`px-3 py-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 ${node.data.resolution === r ? 'text-blue-400 bg-slate-50' : 'text-slate-600'}`}>{r}</div>))}</div></div></div>)}
                         </div>
                         <button onClick={handleActionClick} disabled={isWorking} className={`relative flex items-center gap-2 px-4 py-1.5 rounded-[12px] font-bold text-[10px] tracking-wide transition-all duration-300 ${isWorking ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-black hover:shadow-lg hover:shadow-cyan-500/20 hover:scale-105 active:scale-95'}`}>{isWorking ? <Loader2 className="animate-spin" size={12} /> : <Wand2 size={12} />}<span>{isWorking ? '生成中...' : '生成'}</span></button>
                     </div>

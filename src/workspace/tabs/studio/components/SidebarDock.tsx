@@ -46,6 +46,7 @@ const getNodeNameCN = (t: string) => {
         case NodeType.PROMPT_INPUT: return '创意描述';
         case NodeType.IMAGE_GENERATOR: return '图片生成';
         case NodeType.VIDEO_GENERATOR: return '视频生成';
+        case NodeType.VIDEO_FACTORY: return '视频工厂';
         case NodeType.AUDIO_GENERATOR: return '灵感音乐';
         case NodeType.VIDEO_ANALYZER: return '视频分析';
         case NodeType.IMAGE_EDITOR: return '图像编辑';
@@ -58,6 +59,7 @@ const getNodeIcon = (t: string) => {
         case NodeType.PROMPT_INPUT: return Type;
         case NodeType.IMAGE_GENERATOR: return ImageIcon;
         case NodeType.VIDEO_GENERATOR: return Film;
+        case NodeType.VIDEO_FACTORY: return Clapperboard;
         case NodeType.AUDIO_GENERATOR: return Mic2;
         case NodeType.VIDEO_ANALYZER: return ScanFace;
         case NodeType.IMAGE_EDITOR: return Brush;
@@ -277,7 +279,7 @@ export const SidebarDock: React.FC<SidebarDockProps> = ({
                     </span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-2">
-                    {[NodeType.PROMPT_INPUT, NodeType.IMAGE_GENERATOR, NodeType.VIDEO_GENERATOR, NodeType.AUDIO_GENERATOR, NodeType.VIDEO_ANALYZER, NodeType.IMAGE_EDITOR].map(t => {
+                    {[NodeType.PROMPT_INPUT, NodeType.IMAGE_GENERATOR, NodeType.VIDEO_GENERATOR, NodeType.VIDEO_FACTORY, NodeType.AUDIO_GENERATOR, NodeType.VIDEO_ANALYZER, NodeType.IMAGE_EDITOR].map(t => {
                         const ItemIcon = getNodeIcon(t);
                         return (
                             <button 
